@@ -1,0 +1,127 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: WPU Redirection Extended\n"
+"POT-Creation-Date: 2026-02-03 11:58+0100\n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: fr_FR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Poedit-Basepath: .\n"
+"X-Poedit-KeywordsList: __;_x;_e\n"
+"X-Generator: Poedit 3.8\n"
+"X-Poedit-SearchPath-0: ../.\n"
+"X-Poedit-SearchPathExcluded-0: inc/WPUBaseAdminDatas\n"
+"X-Poedit-SearchPathExcluded-1: inc/WPUBaseAdminPage\n"
+"X-Poedit-SearchPathExcluded-2: inc/WPUBaseCron\n"
+"X-Poedit-SearchPathExcluded-3: inc/WPUBaseEmail\n"
+"X-Poedit-SearchPathExcluded-4: inc/WPUBaseFields\n"
+"X-Poedit-SearchPathExcluded-5: inc/WPUBaseFileCache\n"
+"X-Poedit-SearchPathExcluded-6: inc/WPUBaseMessages\n"
+"X-Poedit-SearchPathExcluded-7: inc/WPUBaseSettings\n"
+"X-Poedit-SearchPathExcluded-8: inc/WPUBaseToolbox\n"
+"X-Poedit-SearchPathExcluded-9: inc/WPUBaseUpdate\n"
+
+#: .././inc/WPUBaseAdminPage/WPUBaseAdminPage.php:202
+msgid "Help"
+msgstr "Aide"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:169
+msgid "Submit"
+msgstr "Envoyer"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:195
+msgid "Previous"
+msgstr "Précédent"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:196
+msgid "Next"
+msgstr "Suivant"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:244
+msgid "No"
+msgstr "Non"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:245
+msgid "Yes"
+msgstr "Oui"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:388
+#, php-format
+msgid "The field “%s” is required"
+msgstr "Le champ « %s » est obligatoire"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:393
+#, php-format
+msgid "The field “%s” should be an email"
+msgstr "Le champ « %s » devrait être un e-mail"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:700
+#, php-format
+msgid ""
+"The plugin <b>%s</b> depends on the following plugins. Please install and "
+"activate them:"
+msgstr ""
+"Le plugin <b>%s</b> dépend des plugins suivants. Veuillez les installer et "
+"les activer :"
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:706
+#, php-format
+msgid ""
+"The plugin <b>%s</b> depends on the <b>%s</b> plugin. Please install and "
+"activate it."
+msgstr ""
+"Le plugin <b>%s</b> dépend du plugin <b>%s</b>. Merci de l’installer et de "
+"l’activer."
+
+#: .././inc/WPUBaseToolbox/WPUBaseToolbox.php:752
+msgid "No data available."
+msgstr "Pas de données disponibles."
+
+#: .././wpu_redirection_extended.php:50
+msgid "Enhance the Redirection plugin with additional features."
+msgstr ""
+"Améliore le plugin Redirection avec des fonctionnalités supplémentaires."
+
+#: .././wpu_redirection_extended.php:71
+msgid "Settings"
+msgstr "Réglages"
+
+#: .././wpu_redirection_extended.php:112
+msgid "Validate your CSV file"
+msgstr "Validez votre fichier CSV"
+
+#: .././wpu_redirection_extended.php:115
+msgid "CSV File"
+msgstr "Fichier CSV"
+
+#: .././wpu_redirection_extended.php:119
+msgid "Upload"
+msgstr "Téléverser"
+
+#: .././wpu_redirection_extended.php:135
+msgid "No file uploaded or upload error."
+msgstr "Aucun fichier téléchargé ni erreur de téléversement."
+
+#: .././wpu_redirection_extended.php:153
+msgid "The uploaded file is not a valid CSV."
+msgstr "Le fichier téléchargé n’est pas un CSV valide."
+
+#: .././wpu_redirection_extended.php:245
+msgid "Top 404 Errors from Bots"
+msgstr "Top 404 des erreurs des bots"
+
+#: .././wpu_redirection_extended.php:265
+msgid "Hits"
+msgstr "Vues"
+
+#: .././wpu_redirection_extended.php:266
+msgid "URL"
+msgstr "URL"
+
+#: .././wpu_redirection_extended.php:271
+msgid "See all errors"
+msgstr "Voir toutes les erreurs"
