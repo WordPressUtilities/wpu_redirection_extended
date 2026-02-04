@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.1.0
+Version: 0.2.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.1.0';
+    private $plugin_version = '0.2.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -57,7 +57,7 @@ class WPURedirectionExtended {
         require_once __DIR__ . '/inc/WPUBaseToolbox/WPUBaseToolbox.php';
         $this->basetoolbox = new \wpu_redirection_extended\WPUBaseToolbox(array(
             'need_form_js' => false,
-            'plugin_name' => $this->plugin_settings['name'],
+            'plugin_name' => $this->plugin_settings['name']
         ));
     }
 
@@ -136,13 +136,35 @@ class WPURedirectionExtended {
         echo '</table>';
         submit_button(__('Upload', 'wpu_redirection_extended'), 'primary', 'submit_upload_csv');
 
+        echo '<hr />';
+        echo '<h2>' . __('Clean database', 'wpu_redirection_extended') . '</h2>';
+        echo '<p>' . __('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
+        submit_button(__('Clean', 'wpu_redirection_extended'), 'primary', 'submit_clean_database');
+
     }
 
     public function page_action__main() {
 
         if (isset($_POST['submit_upload_csv'])) {
-
             $this->page_action__main__submit_csv();
+        }
+
+        if (isset($_POST['submit_clean_database'])) {
+            global $wpdb;
+            $deleted = $wpdb->query("
+                DELETE FROM {$wpdb->prefix}redirection_404
+                WHERE url IN(SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex')
+                OR url LIKE '/.well-known/%'
+                OR url LIKE '%.php%'
+                OR url LIKE '%.js.map%'
+                OR url LIKE '%admin%'
+            ");
+
+            if (!$deleted) {
+                $this->set_message('database_cleaned', __('No invalid 404 log entries found.', 'wpu_redirection_extended'), 'success');
+                return;
+            }
+            $this->set_message('database_cleaned', sprintf(__('Deleted %s log entries.', 'wpu_redirection_extended'), '<strong>' . $deleted . '</strong>'), 'success');
         }
 
     }
@@ -150,7 +172,7 @@ class WPURedirectionExtended {
     public function page_action__main__submit_csv() {
 
         if (!isset($_FILES['upload_file']) || $_FILES['upload_file']['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES['upload_file']['tmp_name'])) {
-            $this->set_message('csv_upload_error', __('No file uploaded or upload error.', 'wpu_redirection_extended'));
+            $this->set_message('csv_upload_error', __('No file uploaded or upload error.', 'wpu_redirection_extended'), 'error');
             return false;
         }
 
