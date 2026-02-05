@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.2.0
+Version: 0.3.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,12 +21,12 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.2.0';
+    private $plugin_version = '0.3.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
     );
-    private $user_level = 'create_users';
+    private $user_level = 'wpu_redirection_extended_access';
     private $basetoolbox;
     private $messages;
     private $adminpages;
@@ -37,7 +37,14 @@ class WPURedirectionExtended {
         add_action('init', array(&$this, 'load_admin_page'));
         add_action('init', array(&$this, 'load_messages'));
         add_action('init', array(&$this, 'check_dependencies'));
+        add_action('init', array(&$this, 'set_custom_roles'), 11);
         add_action('wp_dashboard_setup', array(&$this, 'add_dashboard_widgets'));
+        add_action('admin_menu', array(&$this, 'set_admin_menus'), 10);
+
+        /* Redirection settings */
+        add_filter('redirection_role', function ($role) {
+            return $this->user_level;
+        });
     }
 
     # TRANSLATION
@@ -119,6 +126,60 @@ class WPURedirectionExtended {
                 'name' => 'Redirection'
             )
         ));
+    }
+
+    /* ----------------------------------------------------------
+      Menus
+    ---------------------------------------------------------- */
+
+    public function set_admin_menus() {
+        if (!defined('REDIRECTION_DB_VERSION')) {
+            return;
+        }
+        /* Quick menu to Redirection */
+        add_menu_page(
+            __('Redirection', 'wpu_redirection_extended'),
+            __('Redirection', 'wpu_redirection_extended'),
+            $this->user_level,
+            'tools.php?page=redirection.php'
+        );
+        /*  Additionnal submenu for settings */
+        add_submenu_page(
+            'tools.php?page=redirection.php',
+            __('Extended settings', 'wpu_redirection_extended'),
+            __('Extended settings', 'wpu_redirection_extended'),
+            $this->user_level,
+            'tools.php?page=wpu_redirection_extended-main'
+        );
+    }
+
+    /* ----------------------------------------------------------
+      Roles
+    ---------------------------------------------------------- */
+
+    public function set_custom_roles() {
+        /* Set access to existing roles */
+        $this->update_role('super_editor');
+        $this->update_role('administrator');
+        $this->create_custom_role();
+    }
+
+    public function create_custom_role() {
+        $capabilities = array();
+        $capabilities[$this->user_level] = true;
+        $this->basetoolbox->create_custom_user_role($capabilities, array(
+            'role_opt' => 'wpu_redirection_extended_manager',
+            'role_id' => 'redirection_manager',
+            'role_name' => __('Redirection Manager', 'wpu_redirection_extended')
+        ));
+    }
+
+    public function update_role($user_role) {
+        $role = get_role($user_role);
+        if (!$role) {
+            return;
+        }
+        $role->add_cap($this->user_level, true);
     }
 
     /* ----------------------------------------------------------
