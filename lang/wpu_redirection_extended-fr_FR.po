@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: WPU Redirection Extended\n"
-"POT-Creation-Date: 2026-02-05 11:47+0100\n"
+"POT-Creation-Date: 2026-02-11 11:34+0100\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -111,51 +111,67 @@ msgid "CSV File"
 msgstr "Fichier CSV"
 
 #: .././wpu_redirection_extended.php:198
+msgid "Filter existing slugs"
+msgstr "Filtrer les slugs existants"
+
+#: .././wpu_redirection_extended.php:199
+msgid "Existing slugs will be removed"
+msgstr "Les slugs existants seront retirés"
+
+#: .././wpu_redirection_extended.php:203
+msgid "Filter existing redirections"
+msgstr "Filtrer les redirections existantes"
+
+#: .././wpu_redirection_extended.php:204
+msgid "Existing redirections will be removed"
+msgstr "Les redirections existantes seront supprimées"
+
+#: .././wpu_redirection_extended.php:208
 msgid "Upload"
 msgstr "Téléverser"
 
-#: .././wpu_redirection_extended.php:201
+#: .././wpu_redirection_extended.php:211
 msgid "Clean database"
 msgstr "Nettoyer la base"
 
-#: .././wpu_redirection_extended.php:202
+#: .././wpu_redirection_extended.php:212
 msgid "Delete 404 logs where redirections exist or are not useful."
 msgstr ""
 "Supprimez les logs 404 où les redirections existent ou ne sont pas utiles."
 
-#: .././wpu_redirection_extended.php:203
+#: .././wpu_redirection_extended.php:213
 msgid "Clean"
 msgstr "Nettoyer"
 
-#: .././wpu_redirection_extended.php:225
+#: .././wpu_redirection_extended.php:234
 msgid "No invalid 404 log entries found."
 msgstr "Aucune entrée de journal 404 invalide trouvée."
 
-#: .././wpu_redirection_extended.php:228
+#: .././wpu_redirection_extended.php:237
 #, php-format
 msgid "Deleted %s log entries."
 msgstr "%s entrées de journal ont été supprimées."
 
-#: .././wpu_redirection_extended.php:236
+#: .././wpu_redirection_extended.php:245
 msgid "No file uploaded or upload error."
 msgstr "Aucun fichier téléchargé ni erreur de téléversement."
 
-#: .././wpu_redirection_extended.php:254
+#: .././wpu_redirection_extended.php:263
 msgid "The uploaded file is not a valid CSV."
 msgstr "Le fichier téléchargé n’est pas un CSV valide."
 
-#: .././wpu_redirection_extended.php:346
+#: .././wpu_redirection_extended.php:412
 msgid "Top 404 Errors from Bots"
 msgstr "Top des erreurs 404 des bots"
 
-#: .././wpu_redirection_extended.php:366
+#: .././wpu_redirection_extended.php:432
 msgid "Hits"
 msgstr "Vues"
 
-#: .././wpu_redirection_extended.php:367
+#: .././wpu_redirection_extended.php:433
 msgid "URL"
 msgstr "URL"
 
-#: .././wpu_redirection_extended.php:372
+#: .././wpu_redirection_extended.php:438
 msgid "See all errors"
 msgstr "Voir toutes les erreurs"

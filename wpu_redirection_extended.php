@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.3.0
+Version: 0.4.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.3.0';
+    private $plugin_version = '0.4.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -190,10 +190,20 @@ class WPURedirectionExtended {
 
         echo '<h2>' . __('Validate your CSV file', 'wpu_redirection_extended') . '</h2>';
         echo '<table class="form-table">';
-        echo '<tr>';
-        echo '<th scope="row"><label for="upload_file">' . __('CSV File', 'wpu_redirection_extended') . '</label></th>';
-        echo '<td><input type="file" accept="text/csv" name="upload_file"  id="upload_file" /></td>';
-        echo '</tr>';
+        echo $this->get_admin_field_html('upload_file', array(
+            'label' => __('CSV File', 'wpu_redirection_extended'),
+            'type' => 'upload'
+        ));
+        echo $this->get_admin_field_html('filter_existing_slugs', array(
+            'label' => __('Filter existing slugs', 'wpu_redirection_extended'),
+            'label_checkbox' => __('Existing slugs will be removed', 'wpu_redirection_extended'),
+            'type' => 'checkbox'
+        ));
+        echo $this->get_admin_field_html('filter_existing_redirections', array(
+            'label' => __('Filter existing redirections', 'wpu_redirection_extended'),
+            'label_checkbox' => __('Existing redirections will be removed', 'wpu_redirection_extended'),
+            'type' => 'checkbox'
+        ));
         echo '</table>';
         submit_button(__('Upload', 'wpu_redirection_extended'), 'primary', 'submit_upload_csv');
 
@@ -201,7 +211,6 @@ class WPURedirectionExtended {
         echo '<h2>' . __('Clean database', 'wpu_redirection_extended') . '</h2>';
         echo '<p>' . __('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
         submit_button(__('Clean', 'wpu_redirection_extended'), 'primary', 'submit_clean_database');
-
     }
 
     public function page_action__main() {
@@ -257,6 +266,22 @@ class WPURedirectionExtended {
         $csv_values = array();
         $line_number = 0;
         $handle = fopen($_FILES['upload_file']['tmp_name'], 'r');
+
+        $filter_existing_slugs = isset($_POST['filter_existing_slugs']) && $_POST['filter_existing_slugs'] == '1';
+        $existing_slugs = array();
+        if ($filter_existing_slugs) {
+            $existing_slugs = $this->get_existing_slugs();
+        }
+
+        $filter_existing_redirections = isset($_POST['filter_existing_redirections']) && $_POST['filter_existing_redirections'] == '1';
+        $existing_redirections = array();
+        if ($filter_existing_redirections) {
+            global $wpdb;
+            $results = $wpdb->get_results("SELECT match_url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex'", ARRAY_A);
+            foreach ($results as $row) {
+                $existing_redirections[] = $row['match_url'];
+            }
+        }
 
         while (($row = fgetcsv($handle)) !== false) {
             $line_number++;
@@ -321,6 +346,16 @@ class WPURedirectionExtended {
                 continue;
             }
 
+            /* Filter existing slugs */
+            if ($filter_existing_slugs && in_array($before, $existing_slugs)) {
+                continue;
+            }
+
+            /* Filter existing redirections */
+            if ($filter_existing_redirections && in_array($before, $existing_redirections)) {
+                continue;
+            }
+
             $csv_values[] = array(
                 'before' => $before,
                 'after' => $after
@@ -331,6 +366,37 @@ class WPURedirectionExtended {
         $this->basetoolbox->export_array_to_csv($csv_values, 'validated_redirections.csv', array(
             'add_keys' => false
         ));
+    }
+
+    public function get_existing_slugs() {
+        $posts = get_posts(array(
+            'post_type' => 'any',
+            'post_status' => 'any',
+            'numberposts' => -1,
+            'fields' => 'ids'
+        ));
+        foreach ($posts as $post_id) {
+            $existing_slugs[] = str_replace(home_url(), '', get_permalink($post_id));
+        }
+
+        $taxonomies = get_taxonomies(array(
+            'public' => true
+        ), 'names');
+
+        foreach ($taxonomies as $taxonomy) {
+            $terms = get_terms(array(
+                'taxonomy' => $taxonomy,
+                'hide_empty' => true,
+                'fields' => 'ids'
+            ));
+            foreach ($terms as $term_id) {
+                $term_link = get_term_link($term_id);
+                if (!is_wp_error($term_link)) {
+                    $existing_slugs[] = str_replace(home_url(), '', $term_link);
+                }
+            }
+        }
+        return $existing_slugs;
     }
 
     /* ----------------------------------------------------------
@@ -372,6 +438,46 @@ class WPURedirectionExtended {
         echo __('See all errors', 'wpu_redirection_extended');
         echo '</a></p>';
 
+    }
+
+    /* ----------------------------------------------------------
+      Helpers
+    ---------------------------------------------------------- */
+
+    public function get_admin_field_html($field_id, $field = array()) {
+        $html = '';
+        if (!is_array($field)) {
+            return '';
+        }
+        $field = array_merge(array(
+            'label' => $field_id,
+            'type' => 'text'
+        ), $field);
+
+        if (!isset($field['label_checkbox'])) {
+            $field['label_checkbox'] = $field['label'];
+        }
+
+        $field_html = '';
+        switch ($field['type']) {
+        case 'checkbox':
+            $field_html .= '<input type="checkbox" name="' . esc_attr($field_id) . '" id="' . esc_attr($field_id) . '" value="1" />';
+            $field_html .= '<label for="' . esc_attr($field_id) . '">' . esc_html($field['label_checkbox']) . '</label>';
+            break;
+        case 'upload':
+            $field_html .= '<input type="file" name="' . esc_attr($field_id) . '" id="' . esc_attr($field_id) . '" />';
+            break;
+        case 'text':
+        default:
+            $field_html .= '<input type="text" name="' . esc_attr($field_id) . '" id="' . esc_attr($field_id) . '" class="regular-text" />';
+        }
+
+        $html .= '<tr>';
+        $html .= '<th scope="row"><label for="' . esc_attr($field_id) . '">' . esc_html($field['label']) . '</label></th>';
+        $html .= '<td>' . $field_html . '</td>';
+        $html .= '</tr>';
+
+        return $html;
     }
 
 }
