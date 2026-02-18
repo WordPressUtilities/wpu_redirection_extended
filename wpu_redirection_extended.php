@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.4.1
+Version: 0.5.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.4.1';
+    private $plugin_version = '0.5.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -207,6 +207,9 @@ class WPURedirectionExtended {
         echo '</table>';
         submit_button(__('Upload', 'wpu_redirection_extended'), 'primary', 'submit_upload_csv');
 
+        if (!$this->is_redirection_configured()) {
+            return;
+        }
         echo '<hr />';
         echo '<h2>' . __('Clean database', 'wpu_redirection_extended') . '</h2>';
         echo '<p>' . __('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
@@ -221,6 +224,12 @@ class WPURedirectionExtended {
 
         if (isset($_POST['submit_clean_database'])) {
             global $wpdb;
+
+            if (!$this->is_redirection_configured()) {
+                $this->set_message('database_cleaned', __('Redirection plugin is not configured.', 'wpu_redirection_extended'), 'error');
+                return;
+            }
+
             $deleted = $wpdb->query("
                 DELETE FROM {$wpdb->prefix}redirection_404
                 WHERE url IN(SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex')
@@ -407,16 +416,27 @@ class WPURedirectionExtended {
         if (!current_user_can($this->user_level)) {
             return;
         }
+        if (!$this->is_redirection_configured()) {
+            return;
+        }
+        /* Top 404 from bots */
         wp_add_dashboard_widget(
             'wpu_redirection_extended_top_404_bots',
             __('Top 404 Errors from Bots', 'wpu_redirection_extended'),
             array(&$this, 'wpu_redirection_extended_top_404_bots_dashboard_widget__content')
         );
+        /* Top 404 on files */
+        wp_add_dashboard_widget(
+            'wpu_redirection_extended_top_404_files',
+            __('Top 404 Errors on Files', 'wpu_redirection_extended'),
+            array(&$this, 'wpu_redirection_extended_top_404_files_dashboard_widget__content')
+        );
+
     }
 
     public function wpu_redirection_extended_top_404_bots_dashboard_widget__content() {
         global $wpdb;
-        $lines = $wpdb->get_results("
+        echo $this->wpu_redirection_get_widget_content($wpdb->get_results("
             SELECT COUNT(*) AS result_count, url
             FROM {$wpdb->prefix}redirection_404
             WHERE
@@ -425,25 +445,65 @@ class WPURedirectionExtended {
             GROUP BY url
             ORDER BY result_count DESC
             LIMIT 10;
-        ");
+        "), '&filterby%5Bagent%5D=bot&groupby=url');
+    }
 
-        echo $this->basetoolbox->admin_widget_build_table($lines, array(
+    public function wpu_redirection_extended_top_404_files_dashboard_widget__content() {
+        global $wpdb;
+        echo $this->wpu_redirection_get_widget_content($wpdb->get_results("
+            SELECT COUNT(*) AS result_count, url
+            FROM {$wpdb->prefix}redirection_404
+            WHERE
+                url LIKE '%.pdf%'
+                OR url LIKE '%.jpg%'
+                OR url LIKE '%.png%'
+                OR url LIKE '%.jpeg%'
+                OR url LIKE '%.gif%'
+                OR url LIKE '%.mp4%'
+            GROUP BY url
+            ORDER BY result_count DESC
+            LIMIT 10;
+        "));
+    }
+
+    public function wpu_redirection_get_widget_content($lines, $search_param = '') {
+        if (empty($lines)) {
+            return '<p>' . __('No data found.', 'wpu_redirection_extended') . '</p>';
+
+        }
+        $html = '';
+        $html .= $this->basetoolbox->admin_widget_build_table($lines, array(
             'columns' => array(
                 __('Hits', 'wpu_redirection_extended'),
                 __('URL', 'wpu_redirection_extended')
             )
         ));
 
-        echo '<p><a class="button" href="' . admin_url('tools.php?page=redirection.php&sub=404s&filterby%5Bagent%5D=bot&groupby=url') . '">';
-        echo __('See all errors', 'wpu_redirection_extended');
-        echo '</a></p>';
-
+        $html .= '<p><a class="button" href="' . admin_url('tools.php?page=redirection.php&sub=404s' . $search_param) . '">';
+        $html .= __('See all errors', 'wpu_redirection_extended');
+        $html .= '</a></p>';
+        return $html;
     }
 
     /* ----------------------------------------------------------
       Helpers
     ---------------------------------------------------------- */
 
+    /* Is redirection configured */
+    public function is_redirection_configured() {
+        if (!defined('REDIRECTION_DB_VERSION')) {
+            return false;
+        }
+
+        global $wpdb;
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$wpdb->prefix}redirection_items'") === "{$wpdb->prefix}redirection_items";
+        if (!$table_exists) {
+            return false;
+        }
+        return true;
+    }
+
+    /* Field */
     public function get_admin_field_html($field_id, $field = array()) {
         $html = '';
         if (!is_array($field)) {

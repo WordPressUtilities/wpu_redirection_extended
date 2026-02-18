@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: WPU Redirection Extended\n"
-"POT-Creation-Date: 2026-02-11 11:34+0100\n"
+"POT-Creation-Date: 2026-02-18 19:48+0100\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -130,48 +130,60 @@ msgstr "Les redirections existantes seront supprimées"
 msgid "Upload"
 msgstr "Téléverser"
 
-#: .././wpu_redirection_extended.php:211
+#: .././wpu_redirection_extended.php:214
 msgid "Clean database"
 msgstr "Nettoyer la base"
 
-#: .././wpu_redirection_extended.php:212
+#: .././wpu_redirection_extended.php:215
 msgid "Delete 404 logs where redirections exist or are not useful."
 msgstr ""
 "Supprimez les logs 404 où les redirections existent ou ne sont pas utiles."
 
-#: .././wpu_redirection_extended.php:213
+#: .././wpu_redirection_extended.php:216
 msgid "Clean"
 msgstr "Nettoyer"
 
-#: .././wpu_redirection_extended.php:234
+#: .././wpu_redirection_extended.php:229
+msgid "Redirection plugin is not configured."
+msgstr "Le plugin de redirection n’est pas configuré."
+
+#: .././wpu_redirection_extended.php:243
 msgid "No invalid 404 log entries found."
 msgstr "Aucune entrée de journal 404 invalide trouvée."
 
-#: .././wpu_redirection_extended.php:237
+#: .././wpu_redirection_extended.php:246
 #, php-format
 msgid "Deleted %s log entries."
 msgstr "%s entrées de journal ont été supprimées."
 
-#: .././wpu_redirection_extended.php:245
+#: .././wpu_redirection_extended.php:254
 msgid "No file uploaded or upload error."
 msgstr "Aucun fichier téléchargé ni erreur de téléversement."
 
-#: .././wpu_redirection_extended.php:263
+#: .././wpu_redirection_extended.php:272
 msgid "The uploaded file is not a valid CSV."
 msgstr "Le fichier téléchargé n’est pas un CSV valide."
 
-#: .././wpu_redirection_extended.php:412
+#: .././wpu_redirection_extended.php:425
 msgid "Top 404 Errors from Bots"
 msgstr "Top des erreurs 404 des bots"
 
-#: .././wpu_redirection_extended.php:432
+#: .././wpu_redirection_extended.php:431
+msgid "Top 404 Errors on Files"
+msgstr "Top 404 des erreurs sur les fichiers"
+
+#: .././wpu_redirection_extended.php:471
+msgid "No data found."
+msgstr "Aucune donnée n'a été trouvée."
+
+#: .././wpu_redirection_extended.php:477
 msgid "Hits"
 msgstr "Vues"
 
-#: .././wpu_redirection_extended.php:433
+#: .././wpu_redirection_extended.php:478
 msgid "URL"
 msgstr "URL"
 
-#: .././wpu_redirection_extended.php:438
+#: .././wpu_redirection_extended.php:483
 msgid "See all errors"
 msgstr "Voir toutes les erreurs"
