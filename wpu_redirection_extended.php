@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.5.0
+Version: 0.6.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.5.0';
+    private $plugin_version = '0.6.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -205,7 +205,11 @@ class WPURedirectionExtended {
             'type' => 'checkbox'
         ));
         echo '</table>';
-        submit_button(__('Upload', 'wpu_redirection_extended'), 'primary', 'submit_upload_csv');
+        echo '<p>';
+        submit_button(__('Get a list of errors', 'wpu_redirection_extended'), 'secondary', 'submit_get_errors', false);
+        echo ' ';
+        submit_button(__('Get a cleaned CSV', 'wpu_redirection_extended'), 'primary', 'submit_upload_csv', false);
+        echo '</p>';
 
         if (!$this->is_redirection_configured()) {
             return;
@@ -218,8 +222,8 @@ class WPURedirectionExtended {
 
     public function page_action__main() {
 
-        if (isset($_POST['submit_upload_csv'])) {
-            $this->page_action__main__submit_csv();
+        if (isset($_POST['submit_upload_csv']) || isset($_POST['submit_get_errors'])) {
+            $this->page_action__main__submit_csv(isset($_POST['submit_get_errors']));
         }
 
         if (isset($_POST['submit_clean_database'])) {
@@ -248,7 +252,7 @@ class WPURedirectionExtended {
 
     }
 
-    public function page_action__main__submit_csv() {
+    public function page_action__main__submit_csv($get_errors = false) {
 
         if (!isset($_FILES['upload_file']) || $_FILES['upload_file']['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES['upload_file']['tmp_name'])) {
             $this->set_message('csv_upload_error', __('No file uploaded or upload error.', 'wpu_redirection_extended'), 'error');
@@ -269,7 +273,7 @@ class WPURedirectionExtended {
 
         $file_ext = strtolower(pathinfo($_FILES['upload_file']['name'], PATHINFO_EXTENSION));
         if (!in_array($mime_type, $allowed_mime_types) && $file_ext === 'csv') {
-            $this->set_message('csv_upload_error', __('The uploaded file is not a valid CSV.', 'wpu_redirection_extended'));
+            $this->set_message('csv_upload_error', __('The uploaded file is not a valid CSV.', 'wpu_redirection_extended'), 'error');
         }
 
         $csv_values = array();
@@ -292,6 +296,8 @@ class WPURedirectionExtended {
             }
         }
 
+        $errors_list = array();
+
         while (($row = fgetcsv($handle)) !== false) {
             $line_number++;
 
@@ -308,7 +314,7 @@ class WPURedirectionExtended {
             if ($line_number == 1) {
                 $first_val = strtolower(trim($row[0]));
                 /* Skip header line */
-                if ($first_val == 'before' || $first_val == 'from' || $first_val == 'source' || $first_val == 'url') {
+                if ($first_val == 'before' || $first_val == 'from' || $first_val == 'source' || $first_val == 'url' || strpos($first_val, ' url') !== false) {
                     continue;
                 }
             }
@@ -318,6 +324,7 @@ class WPURedirectionExtended {
 
             /* Ignore lines with spaces */
             if (preg_match('/\s/', $before . $after)) {
+                $errors_list[] = sprintf(__('Line %s: contains spaces.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
@@ -347,21 +354,31 @@ class WPURedirectionExtended {
 
             /* Ignore lines where before is equal to after */
             if ($before === $after) {
+                $errors_list[] = sprintf(__('Line %s: before and after values are the same.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
             /* Ignore line where before is / */
             if ($before === '/') {
+                $errors_list[] = sprintf(__('Line %s: before value is /.', 'wpu_redirection_extended'), $line_number);
+                continue;
+            }
+
+            /* Ignore line where before and after only differ by a / */
+            if (rtrim($before, '/') === rtrim($after, '/')) {
+                $errors_list[] = sprintf(__('Line %s: before and after values only differ by a trailing slash.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
             /* Filter existing slugs */
             if ($filter_existing_slugs && in_array($before, $existing_slugs)) {
+                $errors_list[] = sprintf(__('Line %s: before value already exists as a slug.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
             /* Filter existing redirections */
             if ($filter_existing_redirections && in_array($before, $existing_redirections)) {
+                $errors_list[] = sprintf(__('Line %s: before value already exists as a redirection.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
@@ -370,8 +387,23 @@ class WPURedirectionExtended {
                 'after' => $after
             );
         }
-
         fclose($handle);
+
+        if ($get_errors) {
+            if (empty($errors_list)) {
+                $this->set_message('csv_upload_no_errors', __('No errors found in the uploaded file.', 'wpu_redirection_extended'), 'success');
+            } else {
+                $sep = '<br />- ';
+                $this->set_message('csv_upload_errors', __('Errors found in the uploaded file :', 'wpu_redirection_extended') . $sep . implode($sep, $errors_list), 'error');
+            }
+            return;
+        }
+
+        if (empty($csv_values)) {
+            $this->set_message('csv_upload_error', __('No valid redirections found in the uploaded file.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
         $this->basetoolbox->export_array_to_csv($csv_values, 'validated_redirections.csv', array(
             'add_keys' => false
         ));
@@ -405,6 +437,19 @@ class WPURedirectionExtended {
                 }
             }
         }
+
+        /*  Add slugs with and without trailing slash */
+        $existing_slugs_copy = $existing_slugs;
+        foreach ($existing_slugs_copy as $slug) {
+            if (substr($slug, -1) === '/') {
+                $existing_slugs[] = rtrim($slug, '/');
+            } else {
+                $existing_slugs[] = $slug . '/';
+            }
+        }
+
+        $existing_slugs = array_unique($existing_slugs);
+
         return $existing_slugs;
     }
 

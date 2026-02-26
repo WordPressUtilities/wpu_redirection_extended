@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: WPU Redirection Extended\n"
-"POT-Creation-Date: 2026-02-18 19:48+0100\n"
+"POT-Creation-Date: 2026-02-26 10:55+0100\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -126,64 +126,114 @@ msgstr "Filtrer les redirections existantes"
 msgid "Existing redirections will be removed"
 msgstr "Les redirections existantes seront supprimées"
 
-#: .././wpu_redirection_extended.php:208
-msgid "Upload"
-msgstr "Téléverser"
+#: .././wpu_redirection_extended.php:209
+msgid "Get a list of errors"
+msgstr "Obtenir une liste d’erreurs"
 
-#: .././wpu_redirection_extended.php:214
+#: .././wpu_redirection_extended.php:211
+msgid "Get a cleaned CSV"
+msgstr "Obtenir un CSV propre"
+
+#: .././wpu_redirection_extended.php:218
 msgid "Clean database"
 msgstr "Nettoyer la base"
 
-#: .././wpu_redirection_extended.php:215
+#: .././wpu_redirection_extended.php:219
 msgid "Delete 404 logs where redirections exist or are not useful."
 msgstr ""
 "Supprimez les logs 404 où les redirections existent ou ne sont pas utiles."
 
-#: .././wpu_redirection_extended.php:216
+#: .././wpu_redirection_extended.php:220
 msgid "Clean"
 msgstr "Nettoyer"
 
-#: .././wpu_redirection_extended.php:229
+#: .././wpu_redirection_extended.php:233
 msgid "Redirection plugin is not configured."
 msgstr "Le plugin de redirection n’est pas configuré."
 
-#: .././wpu_redirection_extended.php:243
+#: .././wpu_redirection_extended.php:247
 msgid "No invalid 404 log entries found."
 msgstr "Aucune entrée de journal 404 invalide trouvée."
 
-#: .././wpu_redirection_extended.php:246
+#: .././wpu_redirection_extended.php:250
 #, php-format
 msgid "Deleted %s log entries."
 msgstr "%s entrées de journal ont été supprimées."
 
-#: .././wpu_redirection_extended.php:254
+#: .././wpu_redirection_extended.php:258
 msgid "No file uploaded or upload error."
 msgstr "Aucun fichier téléchargé ni erreur de téléversement."
 
-#: .././wpu_redirection_extended.php:272
+#: .././wpu_redirection_extended.php:276
 msgid "The uploaded file is not a valid CSV."
 msgstr "Le fichier téléchargé n’est pas un CSV valide."
 
-#: .././wpu_redirection_extended.php:425
+#: .././wpu_redirection_extended.php:327
+#, php-format
+msgid "Line %s: contains spaces."
+msgstr "Ligne %s : contient des espaces."
+
+#: .././wpu_redirection_extended.php:357
+#, php-format
+msgid "Line %s: before and after values are the same."
+msgstr "Ligne %s : les valeurs avant et après sont identiques."
+
+#: .././wpu_redirection_extended.php:363
+#, php-format
+msgid "Line %s: before value is /."
+msgstr "Ligne %s : la valeur avant est /."
+
+#: .././wpu_redirection_extended.php:369
+#, php-format
+msgid "Line %s: before and after values only differ by a trailing slash."
+msgstr ""
+"Ligne %s : les valeurs avant et après ne diffèrent que par un slash de fin."
+
+#: .././wpu_redirection_extended.php:375
+#, php-format
+msgid "Line %s: before value already exists as a slug."
+msgstr "Ligne %s : la valeur avant existe déjà en tant que slug."
+
+#: .././wpu_redirection_extended.php:381
+#, php-format
+msgid "Line %s: before value already exists as a redirection."
+msgstr "Ligne %s : la valeur avant existe déjà comme redirection."
+
+#: .././wpu_redirection_extended.php:394
+msgid "No errors found in the uploaded file."
+msgstr "Aucune erreur trouvée dans le fichier téléchargé."
+
+#: .././wpu_redirection_extended.php:397
+msgid "Errors found in the uploaded file :"
+msgstr "Erreurs trouvées dans le fichier téléchargé :"
+
+#: .././wpu_redirection_extended.php:403
+msgid "No valid redirections found in the uploaded file."
+msgstr "Aucune redirection valide trouvée dans le fichier téléchargé."
+
+#: .././wpu_redirection_extended.php:470
 msgid "Top 404 Errors from Bots"
 msgstr "Top des erreurs 404 des bots"
 
-#: .././wpu_redirection_extended.php:431
+#: .././wpu_redirection_extended.php:476
 msgid "Top 404 Errors on Files"
 msgstr "Top 404 des erreurs sur les fichiers"
 
-#: .././wpu_redirection_extended.php:471
+#: .././wpu_redirection_extended.php:516
 msgid "No data found."
 msgstr "Aucune donnée n'a été trouvée."
 
-#: .././wpu_redirection_extended.php:477
+#: .././wpu_redirection_extended.php:522
 msgid "Hits"
 msgstr "Vues"
 
-#: .././wpu_redirection_extended.php:478
+#: .././wpu_redirection_extended.php:523
 msgid "URL"
 msgstr "URL"
 
-#: .././wpu_redirection_extended.php:483
+#: .././wpu_redirection_extended.php:528
 msgid "See all errors"
 msgstr "Voir toutes les erreurs"
+
+#~ msgid "Upload"
+#~ msgstr "Téléverser"
