@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.6.0
+Version: 0.7.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.6.0';
+    private $plugin_version = '0.7.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -40,6 +40,7 @@ class WPURedirectionExtended {
         add_action('init', array(&$this, 'set_custom_roles'), 11);
         add_action('wp_dashboard_setup', array(&$this, 'add_dashboard_widgets'));
         add_action('admin_menu', array(&$this, 'set_admin_menus'), 10);
+        add_action('edit_form_after_title', array(&$this, 'notice_slug_match_redirection'));
 
         /* Redirection settings */
         add_filter('redirection_role', function ($role) {
@@ -289,11 +290,7 @@ class WPURedirectionExtended {
         $filter_existing_redirections = isset($_POST['filter_existing_redirections']) && $_POST['filter_existing_redirections'] == '1';
         $existing_redirections = array();
         if ($filter_existing_redirections) {
-            global $wpdb;
-            $results = $wpdb->get_results("SELECT match_url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex'", ARRAY_A);
-            foreach ($results as $row) {
-                $existing_redirections[] = $row['match_url'];
-            }
+            $existing_redirections = $this->get_existing_redirections();
         }
 
         $errors_list = array();
@@ -409,6 +406,16 @@ class WPURedirectionExtended {
         ));
     }
 
+    public function get_existing_redirections() {
+        global $wpdb;
+        $existing_redirections = array();
+        $results = $wpdb->get_results("SELECT match_url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex' and status = 'enabled'", ARRAY_A);
+        foreach ($results as $row) {
+            $existing_redirections[] = $row['match_url'];
+        }
+        return $existing_redirections;
+    }
+
     public function get_existing_slugs() {
         $posts = get_posts(array(
             'post_type' => 'any',
@@ -441,16 +448,41 @@ class WPURedirectionExtended {
         /*  Add slugs with and without trailing slash */
         $existing_slugs_copy = $existing_slugs;
         foreach ($existing_slugs_copy as $slug) {
-            if (substr($slug, -1) === '/') {
-                $existing_slugs[] = rtrim($slug, '/');
-            } else {
-                $existing_slugs[] = $slug . '/';
-            }
+            $existing_slugs[] = $this->get_alternative_url($slug);
         }
 
         $existing_slugs = array_unique($existing_slugs);
 
         return $existing_slugs;
+    }
+
+    /* ----------------------------------------------------------
+      Admin notice if a redirection exists for the current URL slug
+    ---------------------------------------------------------- */
+
+    public function notice_slug_match_redirection() {
+        global $pagenow;
+        if ($pagenow != 'post.php' || !isset($_GET['post']) || !isset($_GET['action']) || $_GET['action'] !== 'edit') {
+            return;
+        }
+        $post_id = intval($_GET['post']);
+        $slug = str_replace(home_url(), '', get_permalink($post_id));
+        if (!$slug) {
+            return;
+        }
+        $slugs_to_check = array(
+            $slug,
+            $this->get_alternative_url($slug)
+        );
+        $existing_redirections = $this->get_existing_redirections();
+        foreach ($slugs_to_check as $slug_to_check) {
+            if (in_array($slug_to_check, $existing_redirections)) {
+                echo '<div class="notice notice-error">';
+                echo wpautop(sprintf(__('A redirection is configured for the current URL : %s.<br />You won’t be able to access the content.', 'wpu_redirection_extended'), '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
+                echo '</div>';
+            }
+        }
+
     }
 
     /* ----------------------------------------------------------
@@ -533,6 +565,15 @@ class WPURedirectionExtended {
     /* ----------------------------------------------------------
       Helpers
     ---------------------------------------------------------- */
+
+    /* Get alternative URL ending */
+    public function get_alternative_url($url) {
+        if (substr($url, -1) === '/') {
+            return rtrim($url, '/');
+        } else {
+            return $url . '/';
+        }
+    }
 
     /* Is redirection configured */
     public function is_redirection_configured() {
