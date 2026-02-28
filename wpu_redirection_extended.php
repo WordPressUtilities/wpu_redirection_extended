@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.7.0
+Version: 0.8.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.7.0';
+    private $plugin_version = '0.8.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -406,12 +406,26 @@ class WPURedirectionExtended {
         ));
     }
 
+    public function get_existing_redirection_regex() {
+        $cache_id = 'wpu_redirection_extended_existing_redirection_regex';
+
+        $existing_redirection_regex = wp_cache_get($cache_id);
+        if ($existing_redirection_regex === false) {
+            global $wpdb;
+            $existing_redirection_regex = $wpdb->get_col("SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url = 'regex' and status = 'enabled'");
+            wp_cache_set($cache_id, $existing_redirection_regex, '', 60);
+        }
+        return $existing_redirection_regex;
+    }
+
     public function get_existing_redirections() {
-        global $wpdb;
-        $existing_redirections = array();
-        $results = $wpdb->get_results("SELECT match_url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex' and status = 'enabled'", ARRAY_A);
-        foreach ($results as $row) {
-            $existing_redirections[] = $row['match_url'];
+        $cache_id = 'wpu_redirection_extended_existing_redirections';
+
+        $existing_redirections = wp_cache_get($cache_id);
+        if ($existing_redirections === false) {
+            global $wpdb;
+            $existing_redirections = $wpdb->get_col("SELECT match_url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex' and status = 'enabled'");
+            wp_cache_set($cache_id, $existing_redirections, '', 60);
         }
         return $existing_redirections;
     }
@@ -470,19 +484,55 @@ class WPURedirectionExtended {
         if (!$slug) {
             return;
         }
+        $existing_redirections = $this->get_existing_redirections();
+
+        /* Set two versions for current slug */
         $slugs_to_check = array(
             $slug,
             $this->get_alternative_url($slug)
         );
-        $existing_redirections = $this->get_existing_redirections();
+        $error_message = __('<a href="%s">A redirection</a> is configured for the current URL : %s.', 'wpu_redirection_extended');
+        $error_message_regex = __('<a href="%s">A regex redirection</a> matches the current URL : %s.', 'wpu_redirection_extended');
+        $error_message_end = __('You won’t be able to access the content.', 'wpu_redirection_extended');
         foreach ($slugs_to_check as $slug_to_check) {
+
+            /* A redirection exists */
             if (in_array($slug_to_check, $existing_redirections)) {
+                /* Optimise slug for search */
+                $slug_search = $slug_to_check;
+                if (substr($slug_search, -1) === '/') {
+                    $slug_search = rtrim($slug_search, '/');
+                }
+                /* Display message and stop */
+                $url = admin_url('tools.php?page=redirection.php&filterby[url]=' . urlencode($slug_search));
                 echo '<div class="notice notice-error">';
-                echo wpautop(sprintf(__('A redirection is configured for the current URL : %s.<br />You won’t be able to access the content.', 'wpu_redirection_extended'), '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
+                echo wpautop(sprintf($error_message . '<br />' . $error_message_end, $url, '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
                 echo '</div>';
+                return;
+            }
+
+            /* Check regex redirections */
+            if ($this->slug_match_regex_redirection($slug_to_check)) {
+                /* Display message and stop */
+                $url = admin_url('tools.php?page=redirection.php&filterby[url-match]=regular');
+                echo '<div class="notice notice-error">';
+                echo wpautop(sprintf($error_message_regex . '<br />' . $error_message_end, $url, '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
+                echo '</div>';
+                return;
+
+            }
+
+        }
+    }
+
+    public function slug_match_regex_redirection($slug) {
+        $regexes = $this->get_existing_redirection_regex();
+        foreach ($regexes as $regex) {
+            if (@preg_match('#' . $regex . '#', $slug)) {
+                return true;
             }
         }
-
+        return false;
     }
 
     /* ----------------------------------------------------------

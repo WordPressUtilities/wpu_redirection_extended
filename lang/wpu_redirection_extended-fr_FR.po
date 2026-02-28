@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: WPU Redirection Extended\n"
-"POT-Creation-Date: 2026-02-27 23:06+0100\n"
+"POT-Creation-Date: 2026-02-28 20:26+0100\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -211,36 +211,44 @@ msgstr "Erreurs trouvées dans le fichier téléchargé :"
 msgid "No valid redirections found in the uploaded file."
 msgstr "Aucune redirection valide trouvée dans le fichier téléchargé."
 
-#: .././wpu_redirection_extended.php:481
+#: .././wpu_redirection_extended.php:494
 #, php-format
 msgid ""
-"A redirection is configured for the current URL : %s.<br />You won’t be able "
-"to access the content."
+"<a href=\"%s\">A redirection</a> is configured for the current URL : %s."
 msgstr ""
-"Une redirection est configurée pour l’URL actuelle : %s.<br />Vous ne "
-"pourrez pas accéder au contenu."
+"<a href=\"%s\">Une redirection</a> est configurée pour l’URL actuelle : %s."
 
-#: .././wpu_redirection_extended.php:502
+#: .././wpu_redirection_extended.php:495
+#, php-format
+msgid "<a href=\"%s\">A regex redirection</a> matches the current URL : %s."
+msgstr ""
+"<a href=\"%s\">Une redirection regex</a> correspond à l’URL actuelle : %s."
+
+#: .././wpu_redirection_extended.php:496
+msgid "You won’t be able to access the content."
+msgstr "Vous ne pourrez pas accéder au contenu."
+
+#: .././wpu_redirection_extended.php:552
 msgid "Top 404 Errors from Bots"
 msgstr "Top des erreurs 404 des bots"
 
-#: .././wpu_redirection_extended.php:508
+#: .././wpu_redirection_extended.php:558
 msgid "Top 404 Errors on Files"
 msgstr "Top 404 des erreurs sur les fichiers"
 
-#: .././wpu_redirection_extended.php:548
+#: .././wpu_redirection_extended.php:598
 msgid "No data found."
 msgstr "Aucune donnée n'a été trouvée."
 
-#: .././wpu_redirection_extended.php:554
+#: .././wpu_redirection_extended.php:604
 msgid "Hits"
 msgstr "Vues"
 
-#: .././wpu_redirection_extended.php:555
+#: .././wpu_redirection_extended.php:605
 msgid "URL"
 msgstr "URL"
 
-#: .././wpu_redirection_extended.php:560
+#: .././wpu_redirection_extended.php:610
 msgid "See all errors"
 msgstr "Voir toutes les erreurs"
 
