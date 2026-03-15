@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.8.1
+Version: 0.9.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.8.1';
+    private $plugin_version = '0.9.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -219,6 +219,15 @@ class WPURedirectionExtended {
         echo '<h2>' . __('Clean database', 'wpu_redirection_extended') . '</h2>';
         echo '<p>' . __('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
         submit_button(__('Clean', 'wpu_redirection_extended'), 'primary', 'submit_clean_database');
+
+        echo '<hr />';
+        echo '<h2>' . __('Clean redirections', 'wpu_redirection_extended') . '</h2>';
+        echo '<p>' . __('Detect common redirection issues and clean them.', 'wpu_redirection_extended') . '</p>';
+        echo '<p>';
+        submit_button(__('Get a list of issues', 'wpu_redirection_extended'), 'secondary', 'submit_get_redirection_issues', false);
+        echo ' ';
+        submit_button(__('Fix issues', 'wpu_redirection_extended'), 'primary', 'submit_fix_redirection_issues', false);
+        echo '</p>';
     }
 
     public function page_action__main() {
@@ -237,7 +246,15 @@ class WPURedirectionExtended {
 
             $deleted = $wpdb->query("
                 DELETE FROM {$wpdb->prefix}redirection_404
-                WHERE url IN(SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex')
+                WHERE url IN(
+                    SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex'
+                )
+                OR SUBSTRING_INDEX(url, '?', 1) IN(
+                    SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex' AND (
+                        match_data LIKE \"%" . addslashes('"flag_query":"pass"') . "%\"
+                        OR match_data LIKE \"%" . addslashes('"flag_query":"ignore"') . "%\"
+                    )
+                )
                 OR url LIKE '/.well-known/%'
                 OR url LIKE '%.php%'
                 OR url LIKE '%.js.map%'
@@ -249,6 +266,10 @@ class WPURedirectionExtended {
                 return;
             }
             $this->set_message('database_cleaned', sprintf(__('Deleted %s log entries.', 'wpu_redirection_extended'), '<strong>' . $deleted . '</strong>'), 'success');
+        }
+
+        if (isset($_POST['submit_fix_redirection_issues']) || isset($_POST['submit_get_redirection_issues'])) {
+            $this->page_action__main__clean_redirections(isset($_POST['submit_get_redirection_issues']));
         }
 
     }
@@ -407,6 +428,115 @@ class WPURedirectionExtended {
         ));
     }
 
+    public function page_action__main__clean_redirections($diagnostic_only = false) {
+        global $wpdb;
+
+        if (!$this->is_redirection_configured()) {
+            $this->set_message('redirections_cleaned', __('Redirection plugin is not configured.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        $redirections = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}redirection_items WHERE status = 'enabled'");
+
+        $issues_found = 0;
+        $existing_slugs = $this->get_existing_slugs();
+        foreach ($redirections as $redirection) {
+
+            if (strpos($redirection->url, '?') === false) {
+                if (!$redirection->match_data) {
+                    $redirection->match_data = '{}';
+                }
+                $match_data = json_decode($redirection->match_data, true);
+
+                /* Invalid flag query */
+                if ($this->page_action__main__clean_redirections__invalid_flag_query($redirection, $match_data, $diagnostic_only)) {
+                    $issues_found++;
+                }
+            }
+
+            /* Match an existing slug */
+            if ($this->page_action__main__clean_redirections__match_existing($redirection, $existing_slugs, $diagnostic_only)) {
+                $issues_found++;
+            }
+
+        }
+
+        if ($diagnostic_only) {
+            if ($issues_found == 0) {
+                $this->set_message('redirection_issues', __('No redirection issue found.', 'wpu_redirection_extended'), 'success');
+            } else {
+                $this->set_message('redirection_issues', sprintf(__('%s redirections have issues that may cause conflicts or unexpected behavior.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'error');
+            }
+        } else {
+            $this->set_message('redirections_cleaned', sprintf(__('Cleaned %s redirections with potential issues.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'success');
+        }
+    }
+
+    /* Check if a redirection has an invalid flag query and disable it if not in diagnostic mode */
+    public function page_action__main__clean_redirections__invalid_flag_query($redirection, $match_data, $diagnostic_only = false) {
+        global $wpdb;
+
+        $has_invalid_flag_query = false;
+        if (!isset($match_data['source']) || !is_array($match_data['source']) || !isset($match_data['source']['flag_query']) || $match_data['source']['flag_query'] != 'pass') {
+            $has_invalid_flag_query = true;
+        }
+
+        if (!$has_invalid_flag_query) {
+            return false;
+        }
+
+        if ($diagnostic_only) {
+            $this->set_message('redirection_issue_query_' . $redirection->id, sprintf(__('Redirection with ID %s (%s) does not allow query parameters and may cause issues.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url)), 'error');
+        } else {
+            if (!isset($match_data['source']) || !is_array($match_data['source'])) {
+                $match_data['source'] = array();
+            }
+            $match_data['source']['flag_query'] = 'pass';
+            $wpdb->update(
+                $wpdb->prefix . 'redirection_items',
+                array('match_data' => json_encode($match_data)),
+                array('id' => $redirection->id),
+                array('%s'),
+                array('%d')
+            );
+        }
+        return true;
+    }
+
+    /* Check if a redirection matches an existing slug and disable it if not in diagnostic mode */
+    public function page_action__main__clean_redirections__match_existing($redirection, $existing_slugs, $diagnostic_only = false) {
+        global $wpdb;
+        $redirection_match_existing = false;
+        if ($redirection->match_url == 'regex') {
+            foreach ($existing_slugs as $slug) {
+                if (@preg_match('#' . $redirection->url . '#', $slug)) {
+                    $redirection_match_existing = true;
+                    break;
+                }
+            }
+        } else {
+            if (in_array($redirection->url, $existing_slugs) || in_array($this->get_alternative_url($redirection->url), $existing_slugs)) {
+                $redirection_match_existing = true;
+            }
+        }
+        if (!$redirection_match_existing) {
+            return false;
+        }
+
+        if ($diagnostic_only) {
+            $this->set_message('redirection_issue_' . $redirection->id, sprintf(__('Redirection with ID %s (%s) matches an existing slug and may cause conflicts.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url)), 'error');
+        } else {
+            $wpdb->update(
+                $wpdb->prefix . 'redirection_items',
+                array('status' => 'disabled'),
+                array('id' => $redirection->id),
+                array('%s'),
+                array('%d')
+            );
+        }
+        return true;
+    }
+
     public function get_existing_redirection_regex() {
         $cache_id = 'wpu_redirection_extended_existing_redirection_regex';
 
@@ -560,6 +690,12 @@ class WPURedirectionExtended {
             __('Top 404 Errors on Files', 'wpu_redirection_extended'),
             array(&$this, 'wpu_redirection_extended_top_404_files_dashboard_widget__content')
         );
+        /* Top 404 with UTM source */
+        wp_add_dashboard_widget(
+            'wpu_redirection_extended_top_404_utm',
+            __('Top 404 Errors with UTM Source', 'wpu_redirection_extended'),
+            array(&$this, 'wpu_redirection_extended_top_404_utm_dashboard_widget__content')
+        );
 
     }
 
@@ -593,6 +729,18 @@ class WPURedirectionExtended {
             ORDER BY result_count DESC
             LIMIT 10;
         "));
+    }
+
+    public function wpu_redirection_extended_top_404_utm_dashboard_widget__content() {
+        global $wpdb;
+        echo $this->wpu_redirection_get_widget_content($wpdb->get_results("
+            SELECT COUNT(*) AS result_count, SUBSTRING_INDEX(url, '?', 1) AS url
+            FROM {$wpdb->prefix}redirection_404
+            WHERE url LIKE '%\?utm_%'
+            GROUP BY SUBSTRING_INDEX(url, '?', 1)
+            ORDER BY result_count DESC
+            LIMIT 10;
+        "), '&filterby%5Burl%5D=utm_');
     }
 
     public function wpu_redirection_get_widget_content($lines, $search_param = '') {
