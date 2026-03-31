@@ -4,12 +4,12 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.9.0
+Version: 0.9.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
 Domain Path: /lang
-Requires at least: 6.2
+Requires at least: 6.7
 Requires PHP: 8.0
 Network: Optional
 License: MIT License
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.9.0';
+    private $plugin_version = '0.9.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -371,6 +371,11 @@ class WPURedirectionExtended {
                 $after = '/' . $after;
             }
 
+            /* Avoid after value to end with two / */
+            if (substr($after, -2) === '//') {
+                $after = rtrim($after, '/');
+            }
+
             /* Ignore lines where before is equal to after */
             if ($before === $after) {
                 $errors_list[] = sprintf(__('Line %s: before and after values are the same.', 'wpu_redirection_extended'), $line_number);
@@ -389,14 +394,16 @@ class WPURedirectionExtended {
                 continue;
             }
 
+            $alternative_before = $this->get_alternative_url($before);
+
             /* Filter existing slugs */
-            if ($filter_existing_slugs && in_array($before, $existing_slugs)) {
+            if ($filter_existing_slugs && (in_array($before, $existing_slugs) || in_array($alternative_before, $existing_slugs))) {
                 $errors_list[] = sprintf(__('Line %s: before value already exists as a slug.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
             /* Filter existing redirections */
-            if ($filter_existing_redirections && in_array($before, $existing_redirections)) {
+            if ($filter_existing_redirections && (in_array($before, $existing_redirections) || in_array($alternative_before, $existing_redirections))) {
                 $errors_list[] = sprintf(__('Line %s: before value already exists as a redirection.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
