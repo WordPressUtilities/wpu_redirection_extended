@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.9.1
+Version: 0.9.2
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.9.1';
+    private $plugin_version = '0.9.2';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -623,6 +623,11 @@ class WPURedirectionExtended {
         if (!$slug) {
             return;
         }
+
+        if (!$this->is_redirection_configured()) {
+            return;
+        }
+
         $existing_redirections = $this->get_existing_redirections();
 
         /* Set two versions for current slug */
