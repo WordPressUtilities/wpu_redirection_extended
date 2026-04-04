@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.9.2
+Version: 0.9.3
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.9.2';
+    private $plugin_version = '0.9.3';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -41,6 +41,7 @@ class WPURedirectionExtended {
         add_action('wp_dashboard_setup', array(&$this, 'add_dashboard_widgets'));
         add_action('admin_menu', array(&$this, 'set_admin_menus'), 10);
         add_action('edit_form_after_title', array(&$this, 'notice_slug_match_redirection'));
+        add_action('init', array(&$this, 'notice_slug_match_redirection__all_terms'));
 
         /* Redirection settings */
         add_filter('redirection_role', function ($role) {
@@ -613,18 +614,41 @@ class WPURedirectionExtended {
       Admin notice if a redirection exists for the current URL slug
     ---------------------------------------------------------- */
 
-    public function notice_slug_match_redirection() {
+    public function get_current_slug() {
+        $slug = false;
         global $pagenow;
-        if ($pagenow != 'post.php' || !isset($_GET['post']) || !isset($_GET['action']) || $_GET['action'] !== 'edit') {
-            return;
+        if ($pagenow == 'post.php' && isset($_GET['post'], $_GET['action']) && $_GET['action'] == 'edit') {
+            $post_id = intval($_GET['post']);
+            $slug = str_replace(home_url(), '', get_permalink($post_id));
         }
-        $post_id = intval($_GET['post']);
-        $slug = str_replace(home_url(), '', get_permalink($post_id));
-        if (!$slug) {
+        if ($pagenow == 'term.php' && isset($_GET['tag_ID'], $_GET['taxonomy'])) {
+            $term_id = intval($_GET['tag_ID']);
+            $taxonomy = sanitize_text_field($_GET['taxonomy']);
+            $term_link = get_term_link($term_id, $taxonomy);
+            if (!is_wp_error($term_link)) {
+                $slug = str_replace(home_url(), '', $term_link);
+            }
+        }
+
+        return $slug;
+    }
+
+    public function notice_slug_match_redirection__all_terms() {
+        $taxonomies = get_taxonomies(array(
+            'public' => true
+        ), 'names');
+        foreach ($taxonomies as $taxonomy) {
+            add_action($taxonomy . '_term_edit_form_tag', array(&$this, 'notice_slug_match_redirection'));
+        }
+    }
+
+    public function notice_slug_match_redirection() {
+        if (!$this->is_redirection_configured()) {
             return;
         }
 
-        if (!$this->is_redirection_configured()) {
+        $slug = $this->get_current_slug();
+        if (!$slug) {
             return;
         }
 
@@ -667,6 +691,7 @@ class WPURedirectionExtended {
             }
 
         }
+
     }
 
     public function slug_match_regex_redirection($slug) {
