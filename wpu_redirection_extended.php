@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.9.3
+Version: 0.10.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.9.3';
+    private $plugin_version = '0.10.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -41,7 +41,12 @@ class WPURedirectionExtended {
         add_action('wp_dashboard_setup', array(&$this, 'add_dashboard_widgets'));
         add_action('admin_menu', array(&$this, 'set_admin_menus'), 10);
         add_action('edit_form_after_title', array(&$this, 'notice_slug_match_redirection'));
-        add_action('init', array(&$this, 'notice_slug_match_redirection__all_terms'));
+        add_action('admin_init', array(&$this, 'notice_slug_match_redirection__all_terms'));
+
+        /* Hooks for WP-CLI */
+        add_action('wpu_redirection_extended_clean_database', array(&$this,
+            'page_action__main__submit_clean_database'
+        ));
 
         /* Redirection settings */
         add_filter('redirection_role', function ($role) {
@@ -112,8 +117,13 @@ class WPURedirectionExtended {
     }
     /* Add a message */
     public function set_message($id, $message, $group = '') {
+        $default_string = ($group ? $group . ' - ' : '') . $id . ' - ' . $message;
+        if (php_sapi_name() === 'cli') {
+            echo wp_strip_all_tags($default_string) . PHP_EOL;
+            return;
+        }
         if (!$this->messages) {
-            error_log($id . ' - ' . $message);
+            error_log($default_string);
             return;
         }
         $this->messages->set_message($id, $message, $group);
@@ -238,41 +248,54 @@ class WPURedirectionExtended {
         }
 
         if (isset($_POST['submit_clean_database'])) {
-            global $wpdb;
-
-            if (!$this->is_redirection_configured()) {
-                $this->set_message('database_cleaned', __('Redirection plugin is not configured.', 'wpu_redirection_extended'), 'error');
-                return;
-            }
-
-            $deleted = $wpdb->query("
-                DELETE FROM {$wpdb->prefix}redirection_404
-                WHERE url IN(
-                    SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex'
-                )
-                OR SUBSTRING_INDEX(url, '?', 1) IN(
-                    SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex' AND (
-                        match_data LIKE \"%" . addslashes('"flag_query":"pass"') . "%\"
-                        OR match_data LIKE \"%" . addslashes('"flag_query":"ignore"') . "%\"
-                    )
-                )
-                OR url LIKE '/.well-known/%'
-                OR url LIKE '%.php%'
-                OR url LIKE '%.js.map%'
-                OR url LIKE '%admin%'
-            ");
-
-            if (!$deleted) {
-                $this->set_message('database_cleaned', __('No invalid 404 log entries found.', 'wpu_redirection_extended'), 'success');
-                return;
-            }
-            $this->set_message('database_cleaned', sprintf(__('Deleted %s log entries.', 'wpu_redirection_extended'), '<strong>' . $deleted . '</strong>'), 'success');
+            $this->page_action__main__submit_clean_database();
         }
 
         if (isset($_POST['submit_fix_redirection_issues']) || isset($_POST['submit_get_redirection_issues'])) {
             $this->page_action__main__clean_redirections(isset($_POST['submit_get_redirection_issues']));
         }
 
+    }
+
+    public function page_action__main__submit_clean_database() {
+
+        global $wpdb;
+
+        if (!$this->is_redirection_configured()) {
+            $this->set_message('database_cleaned', __('Redirection plugin is not configured.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        $urls_like = apply_filters('wpu_redirection_extended__submit_clean_database__url_like_conditions', array(
+            "url LIKE '%.php%'",
+            "url LIKE '%.js.map%'",
+            "url LIKE '%admin%'",
+            "url LIKE '/.well-known/%'"
+        ));
+
+        $urls_like_str = '';
+        if (!empty($urls_like)) {
+            $urls_like_str = ' OR ' . implode(' OR ', $urls_like);
+        }
+
+        $deleted = $wpdb->query("
+            DELETE FROM {$wpdb->prefix}redirection_404
+            WHERE url IN(
+                SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex'
+            )
+            OR SUBSTRING_INDEX(url, '?', 1) IN(
+                SELECT url FROM {$wpdb->prefix}redirection_items WHERE match_url != 'regex' AND (
+                    match_data LIKE \"%" . addslashes('"flag_query":"pass"') . "%\"
+                    OR match_data LIKE \"%" . addslashes('"flag_query":"ignore"') . "%\"
+                )
+            )
+            " . $urls_like_str);
+
+        if (!$deleted) {
+            $this->set_message('database_cleaned', __('No invalid 404 log entries found.', 'wpu_redirection_extended'), 'success');
+            return;
+        }
+        $this->set_message('database_cleaned', sprintf(__('Deleted %s log entries.', 'wpu_redirection_extended'), '<strong>' . $deleted . '</strong>'), 'success');
     }
 
     public function page_action__main__submit_csv($get_errors = false) {
@@ -638,7 +661,7 @@ class WPURedirectionExtended {
             'public' => true
         ), 'names');
         foreach ($taxonomies as $taxonomy) {
-            add_action($taxonomy . '_term_edit_form_tag', array(&$this, 'notice_slug_match_redirection'));
+            add_action($taxonomy . '_term_edit_form_top', array(&$this, 'notice_slug_match_redirection'));
         }
     }
 
@@ -866,3 +889,5 @@ class WPURedirectionExtended {
 }
 
 $WPURedirectionExtended = new WPURedirectionExtended();
+
+include_once __DIR__ . '/inc/wp-cli.php';
