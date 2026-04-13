@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.10.0
+Version: 0.11.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.10.0';
+    private $plugin_version = '0.11.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -227,6 +227,15 @@ class WPURedirectionExtended {
             return;
         }
         echo '<hr />';
+        echo '<h2>' . __('Export Top 404', 'wpu_redirection_extended') . '</h2>';
+        echo '<p>' . __('Export the top 404 URLs as a CSV file.', 'wpu_redirection_extended') . '</p>';
+        echo '<p>';
+        echo '<a class="button" href="' . admin_url('tools.php?page=redirection.php&sub=404s&groupby=url') . '">'.__('View', 'wpu_redirection_extended').'</a>';
+        echo ' ';
+        submit_button(__('Export CSV', 'wpu_redirection_extended'), 'primary', 'submit_export_top_404', false);
+        echo '</p>';
+
+        echo '<hr />';
         echo '<h2>' . __('Clean database', 'wpu_redirection_extended') . '</h2>';
         echo '<p>' . __('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
         submit_button(__('Clean', 'wpu_redirection_extended'), 'primary', 'submit_clean_database');
@@ -255,6 +264,27 @@ class WPURedirectionExtended {
             $this->page_action__main__clean_redirections(isset($_POST['submit_get_redirection_issues']));
         }
 
+        if (isset($_POST['submit_export_top_404'])) {
+            $this->page_action__main__export_top_404();
+        }
+
+    }
+
+    public function page_action__main__export_top_404() {
+        global $wpdb;
+        if (!$this->is_redirection_configured()) {
+            return;
+        }
+        $results = $wpdb->get_results("
+            SELECT COUNT(*) AS result_count, url
+            FROM {$wpdb->prefix}redirection_404
+            GROUP BY url
+            ORDER BY result_count DESC
+        ", ARRAY_A);
+        if (!$results) {
+            return;
+        }
+        $this->basetoolbox->export_array_to_csv($results, 'top-404-urls');
     }
 
     public function page_action__main__submit_clean_database() {
@@ -268,7 +298,11 @@ class WPURedirectionExtended {
 
         $urls_like = apply_filters('wpu_redirection_extended__submit_clean_database__url_like_conditions', array(
             "url LIKE '%.php%'",
+            "url LIKE '%.key%'",
+            "url LIKE '%.ini%'",
             "url LIKE '%.js.map%'",
+            "url LIKE '/@vite%'",
+            "url LIKE '/.%'",
             "url LIKE '%admin%'",
             "url LIKE '/.well-known/%'"
         ));
