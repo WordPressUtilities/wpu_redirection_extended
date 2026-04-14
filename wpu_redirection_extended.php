@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.11.0
+Version: 0.12.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.11.0';
+    private $plugin_version = '0.12.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -30,6 +30,7 @@ class WPURedirectionExtended {
     private $basetoolbox;
     private $messages;
     private $adminpages;
+    private $widget_types = array();
 
     public function __construct() {
         add_action('init', array(&$this, 'load_translation'));
@@ -38,10 +39,12 @@ class WPURedirectionExtended {
         add_action('init', array(&$this, 'load_messages'));
         add_action('init', array(&$this, 'check_dependencies'));
         add_action('init', array(&$this, 'set_custom_roles'), 11);
+        add_action('init', array(&$this, 'load_widget_types'));
         add_action('wp_dashboard_setup', array(&$this, 'add_dashboard_widgets'));
         add_action('admin_menu', array(&$this, 'set_admin_menus'), 10);
         add_action('edit_form_after_title', array(&$this, 'notice_slug_match_redirection'));
         add_action('admin_init', array(&$this, 'notice_slug_match_redirection__all_terms'));
+        add_action('admin_init', array(&$this, 'handle_widget_csv_download'));
 
         /* Hooks for WP-CLI */
         add_action('wpu_redirection_extended_clean_database', array(&$this,
@@ -166,6 +169,44 @@ class WPURedirectionExtended {
     }
 
     /* ----------------------------------------------------------
+      Widget Types
+    ---------------------------------------------------------- */
+
+    public function load_widget_types() {
+        global $wpdb;
+        $this->widget_types = apply_filters('wpu_redirection_extended_widget_types', array(
+            'bots' => array(
+                'label' => __('Top 404 Errors from Bots', 'wpu_redirection_extended'),
+                'search_param' => '&filterby%5Bagent%5D=bot&groupby=url',
+                'query' => "SELECT COUNT(*) AS result_count, url
+                    FROM {$wpdb->prefix}redirection_404
+                    WHERE agent LIKE '%bot%' OR ip LIKE '66.249%'
+                    GROUP BY url"
+            ),
+            'files' => array(
+                'label' => __('Top 404 Errors on Files', 'wpu_redirection_extended'),
+                'query' => "SELECT COUNT(*) AS result_count, url
+                    FROM {$wpdb->prefix}redirection_404
+                    WHERE url LIKE '%.pdf%'
+                        OR url LIKE '%.jpg%'
+                        OR url LIKE '%.png%'
+                        OR url LIKE '%.jpeg%'
+                        OR url LIKE '%.gif%'
+                        OR url LIKE '%.mp4%'
+                    GROUP BY url"
+            ),
+            'utm' => array(
+                'label' => __('Top 404 Errors with UTM Source', 'wpu_redirection_extended'),
+                'search_param' => '&filterby%5Burl%5D=utm_',
+                'query' => "SELECT COUNT(*) AS result_count, SUBSTRING_INDEX(url, '?', 1) AS url
+                    FROM {$wpdb->prefix}redirection_404
+                    WHERE url LIKE '%\?utm_%'
+                    GROUP BY SUBSTRING_INDEX(url, '?', 1)"
+            )
+        ));
+    }
+
+    /* ----------------------------------------------------------
       Roles
     ---------------------------------------------------------- */
 
@@ -227,15 +268,6 @@ class WPURedirectionExtended {
             return;
         }
         echo '<hr />';
-        echo '<h2>' . __('Export Top 404', 'wpu_redirection_extended') . '</h2>';
-        echo '<p>' . __('Export the top 404 URLs as a CSV file.', 'wpu_redirection_extended') . '</p>';
-        echo '<p>';
-        echo '<a class="button" href="' . admin_url('tools.php?page=redirection.php&sub=404s&groupby=url') . '">'.__('View', 'wpu_redirection_extended').'</a>';
-        echo ' ';
-        submit_button(__('Export CSV', 'wpu_redirection_extended'), 'primary', 'submit_export_top_404', false);
-        echo '</p>';
-
-        echo '<hr />';
         echo '<h2>' . __('Clean database', 'wpu_redirection_extended') . '</h2>';
         echo '<p>' . __('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
         submit_button(__('Clean', 'wpu_redirection_extended'), 'primary', 'submit_clean_database');
@@ -248,6 +280,15 @@ class WPURedirectionExtended {
         echo ' ';
         submit_button(__('Fix issues', 'wpu_redirection_extended'), 'primary', 'submit_fix_redirection_issues', false);
         echo '</p>';
+
+        foreach ($this->widget_types as $widget_type => $widget_infos) {
+            echo '<hr />';
+            echo '<h2>' . $widget_infos['label'] . '</h2>';
+            echo '<details>';
+            echo $this->wpu_redirection_get_widget_content($widget_type);
+            echo '</details>';
+        }
+
     }
 
     public function page_action__main() {
@@ -263,28 +304,6 @@ class WPURedirectionExtended {
         if (isset($_POST['submit_fix_redirection_issues']) || isset($_POST['submit_get_redirection_issues'])) {
             $this->page_action__main__clean_redirections(isset($_POST['submit_get_redirection_issues']));
         }
-
-        if (isset($_POST['submit_export_top_404'])) {
-            $this->page_action__main__export_top_404();
-        }
-
-    }
-
-    public function page_action__main__export_top_404() {
-        global $wpdb;
-        if (!$this->is_redirection_configured()) {
-            return;
-        }
-        $results = $wpdb->get_results("
-            SELECT COUNT(*) AS result_count, url
-            FROM {$wpdb->prefix}redirection_404
-            GROUP BY url
-            ORDER BY result_count DESC
-        ", ARRAY_A);
-        if (!$results) {
-            return;
-        }
-        $this->basetoolbox->export_array_to_csv($results, 'top-404-urls');
     }
 
     public function page_action__main__submit_clean_database() {
@@ -355,6 +374,7 @@ class WPURedirectionExtended {
         $file_ext = strtolower(pathinfo($_FILES['upload_file']['name'], PATHINFO_EXTENSION));
         if (!in_array($mime_type, $allowed_mime_types) && $file_ext === 'csv') {
             $this->set_message('csv_upload_error', __('The uploaded file is not a valid CSV.', 'wpu_redirection_extended'), 'error');
+            return false;
         }
 
         $csv_values = array();
@@ -776,71 +796,45 @@ class WPURedirectionExtended {
         wp_add_dashboard_widget(
             'wpu_redirection_extended_top_404_bots',
             __('Top 404 Errors from Bots', 'wpu_redirection_extended'),
-            array(&$this, 'wpu_redirection_extended_top_404_bots_dashboard_widget__content')
+            function () {
+                echo $this->wpu_redirection_get_widget_content('bots');
+            }
         );
         /* Top 404 on files */
         wp_add_dashboard_widget(
             'wpu_redirection_extended_top_404_files',
             __('Top 404 Errors on Files', 'wpu_redirection_extended'),
-            array(&$this, 'wpu_redirection_extended_top_404_files_dashboard_widget__content')
+            function () {
+                echo $this->wpu_redirection_get_widget_content('files');
+            }
         );
         /* Top 404 with UTM source */
         wp_add_dashboard_widget(
             'wpu_redirection_extended_top_404_utm',
             __('Top 404 Errors with UTM Source', 'wpu_redirection_extended'),
-            array(&$this, 'wpu_redirection_extended_top_404_utm_dashboard_widget__content')
+            function () {
+                echo $this->wpu_redirection_get_widget_content('utm');
+            }
         );
 
     }
 
-    public function wpu_redirection_extended_top_404_bots_dashboard_widget__content() {
+    public function get_widget_query_results($widget_type, $limit = 0, $output = OBJECT) {
         global $wpdb;
-        echo $this->wpu_redirection_get_widget_content($wpdb->get_results("
-            SELECT COUNT(*) AS result_count, url
-            FROM {$wpdb->prefix}redirection_404
-            WHERE
-                agent LIKE '%bot%'
-                OR ip LIKE '66.249%'
-            GROUP BY url
-            ORDER BY result_count DESC
-            LIMIT 10;
-        "), '&filterby%5Bagent%5D=bot&groupby=url');
+        $limit_sql = $limit > 0 ? ' LIMIT ' . intval($limit) : '';
+        $order_sql = ' ORDER BY result_count DESC ';
+
+        $widget_infos = isset($this->widget_types[$widget_type]) ? $this->widget_types[$widget_type] : false;
+        if (!$widget_infos || !isset($widget_infos['query'])) {
+            return array();
+        }
+        return $wpdb->get_results($widget_infos['query'] . $order_sql . $limit_sql, $output);
     }
 
-    public function wpu_redirection_extended_top_404_files_dashboard_widget__content() {
-        global $wpdb;
-        echo $this->wpu_redirection_get_widget_content($wpdb->get_results("
-            SELECT COUNT(*) AS result_count, url
-            FROM {$wpdb->prefix}redirection_404
-            WHERE
-                url LIKE '%.pdf%'
-                OR url LIKE '%.jpg%'
-                OR url LIKE '%.png%'
-                OR url LIKE '%.jpeg%'
-                OR url LIKE '%.gif%'
-                OR url LIKE '%.mp4%'
-            GROUP BY url
-            ORDER BY result_count DESC
-            LIMIT 10;
-        "));
-    }
-
-    public function wpu_redirection_extended_top_404_utm_dashboard_widget__content() {
-        global $wpdb;
-        echo $this->wpu_redirection_get_widget_content($wpdb->get_results("
-            SELECT COUNT(*) AS result_count, SUBSTRING_INDEX(url, '?', 1) AS url
-            FROM {$wpdb->prefix}redirection_404
-            WHERE url LIKE '%\?utm_%'
-            GROUP BY SUBSTRING_INDEX(url, '?', 1)
-            ORDER BY result_count DESC
-            LIMIT 10;
-        "), '&filterby%5Burl%5D=utm_');
-    }
-
-    public function wpu_redirection_get_widget_content($lines, $search_param = '') {
+    public function wpu_redirection_get_widget_content($widget_type = '') {
+        $lines = $this->get_widget_query_results($widget_type, 10, ARRAY_A);
         if (empty($lines)) {
             return '<p>' . __('No data found.', 'wpu_redirection_extended') . '</p>';
-
         }
         $html = '';
         $html .= $this->basetoolbox->admin_widget_build_table($lines, array(
@@ -850,15 +844,53 @@ class WPURedirectionExtended {
             )
         ));
 
-        $html .= '<p><a class="button" href="' . admin_url('tools.php?page=redirection.php&sub=404s' . $search_param) . '">';
-        $html .= __('See all errors', 'wpu_redirection_extended');
-        $html .= '</a></p>';
+        if ($widget_type) {
+            $widget_infos = isset($this->widget_types[$widget_type]) ? $this->widget_types[$widget_type] : false;
+            $html .= '<p>';
+            if ($widget_infos && isset($widget_infos['search_param'])) {
+                $html .= '<a class="button" href="' . admin_url('tools.php?page=redirection.php&sub=404s' . $widget_infos['search_param']) . '">';
+                $html .= __('See all errors', 'wpu_redirection_extended');
+                $html .= '</a>';
+            }
+            $html .= ' ' . $this->get_widget_download_button($widget_type);
+            $html .= '</p>';
+        }
         return $html;
+    }
+
+    public function get_widget_download_button($widget_type) {
+        $download_url = wp_nonce_url(admin_url('index.php?wpu_redir_ext_download_widget=' . $widget_type), 'wpu_redir_ext_download_' . $widget_type);
+        return '<a class="button" href="' . esc_url($download_url) . '">' . __('Export CSV', 'wpu_redirection_extended') . '</a>';
     }
 
     /* ----------------------------------------------------------
       Helpers
     ---------------------------------------------------------- */
+
+    /* Handle widget CSV download */
+    public function handle_widget_csv_download() {
+        if (!isset($_GET['wpu_redir_ext_download_widget'])) {
+            return;
+        }
+        $widget_type = sanitize_text_field($_GET['wpu_redir_ext_download_widget']);
+        if (!in_array($widget_type, array('bots', 'files', 'utm'))) {
+            return;
+        }
+        if (!wp_verify_nonce($_GET['_wpnonce'], 'wpu_redir_ext_download_' . $widget_type)) {
+            return;
+        }
+        if (!current_user_can($this->user_level)) {
+            return;
+        }
+        if (!$this->is_redirection_configured()) {
+            return;
+        }
+        $results = $this->get_widget_query_results($widget_type, 0, ARRAY_A);
+        if (!$results) {
+            return;
+        }
+        $this->basetoolbox->export_array_to_csv($results, 'top-404-' . $widget_type);
+    }
 
     /* Get alternative URL ending */
     public function get_alternative_url($url) {
