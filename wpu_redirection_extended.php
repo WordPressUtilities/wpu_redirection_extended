@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.12.0
+Version: 0.13.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.12.0';
+    private $plugin_version = '0.13.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -55,6 +55,74 @@ class WPURedirectionExtended {
         add_filter('redirection_role', function ($role) {
             return $this->user_level;
         });
+        add_filter('rest_request_after_callbacks', array(&$this, 'extend_redirect_autocomplete'), 10, 3);
+    }
+
+    # REDIRECT AUTOCOMPLETE
+    public function extend_redirect_autocomplete($response, $handler, $request) {
+        if (!is_a($request, 'WP_REST_Request') || $request->get_route() !== '/redirection/v1/redirect/post') {
+            return $response;
+        }
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $search = sanitize_text_field((string) $request->get_param('text'));
+        if ($search === '') {
+            return $response;
+        }
+
+        $response = rest_ensure_response($response);
+        $data = (array) $response->get_data();
+
+        $post_types = get_post_types(array('public' => true), 'names');
+        unset($post_types['post'], $post_types['page'], $post_types['attachment']);
+        if (!empty($post_types)) {
+            $query = new WP_Query(array(
+                'post_type' => array_values($post_types),
+                'post_status' => 'publish',
+                's' => $search,
+                'posts_per_page' => 10,
+                'no_found_rows' => true,
+                'ignore_sticky_posts' => true,
+                'suppress_filters' => false
+            ));
+            foreach ($query->posts as $post) {
+                $permalink = get_permalink($post);
+                if (!$permalink) {
+                    continue;
+                }
+                $data[] = array(
+                    'title' => html_entity_decode(get_the_title($post), ENT_QUOTES, 'UTF-8'),
+                    'value' => wp_make_link_relative($permalink)
+                );
+            }
+        }
+
+        $taxonomies = get_taxonomies(array('public' => true), 'names');
+        if (!empty($taxonomies)) {
+            $terms = get_terms(array(
+                'taxonomy' => array_values($taxonomies),
+                'search' => $search,
+                'hide_empty' => false,
+                'number' => 10
+            ));
+            if (!is_wp_error($terms)) {
+                foreach ($terms as $term) {
+                    $link = get_term_link($term);
+                    if (is_wp_error($link)) {
+                        continue;
+                    }
+                    $data[] = array(
+                        'title' => html_entity_decode($term->name . ' (' . $term->taxonomy . ')', ENT_QUOTES, 'UTF-8'),
+                        'value' => wp_make_link_relative($link)
+                    );
+                }
+            }
+        }
+
+        $response->set_data($data);
+        return $response;
     }
 
     # TRANSLATION
@@ -655,7 +723,7 @@ class WPURedirectionExtended {
         ));
         $existing_slugs = array();
         foreach ($posts as $post_id) {
-            $existing_slugs[] = str_replace(home_url(), '', get_permalink($post_id));
+            $existing_slugs[] = wp_make_link_relative(get_permalink($post_id));
         }
 
         $taxonomies = get_taxonomies(array(
@@ -671,7 +739,7 @@ class WPURedirectionExtended {
             foreach ($terms as $term_id) {
                 $term_link = get_term_link($term_id);
                 if (!is_wp_error($term_link)) {
-                    $existing_slugs[] = str_replace(home_url(), '', $term_link);
+                    $existing_slugs[] = wp_make_link_relative($term_link);
                 }
             }
         }
@@ -696,14 +764,14 @@ class WPURedirectionExtended {
         global $pagenow;
         if ($pagenow == 'post.php' && isset($_GET['post'], $_GET['action']) && $_GET['action'] == 'edit') {
             $post_id = intval($_GET['post']);
-            $slug = str_replace(home_url(), '', get_permalink($post_id));
+            $slug = wp_make_link_relative(get_permalink($post_id));
         }
         if ($pagenow == 'term.php' && isset($_GET['tag_ID'], $_GET['taxonomy'])) {
             $term_id = intval($_GET['tag_ID']);
             $taxonomy = sanitize_text_field($_GET['taxonomy']);
             $term_link = get_term_link($term_id, $taxonomy);
             if (!is_wp_error($term_link)) {
-                $slug = str_replace(home_url(), '', $term_link);
+                $slug = wp_make_link_relative($term_link);
             }
         }
 
