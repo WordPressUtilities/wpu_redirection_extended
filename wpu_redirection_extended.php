@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.13.2
+Version: 0.14.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.13.2';
+    private $plugin_version = '0.14.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -309,6 +309,32 @@ class WPURedirectionExtended {
 
     public function page_content__main() {
 
+        echo '<h2>' . esc_html__('Generate CSV from sitemap', 'wpu_redirection_extended') . '</h2>';
+        echo '<p>' . esc_html__('Provide the URL of an external sitemap (XML or sitemap index, optionally gzipped). A CSV will be generated with one source URL per line and an empty target column.', 'wpu_redirection_extended') . '</p>';
+        echo '<table class="form-table">';
+        echo $this->get_admin_field_html('sitemap_url', array(
+            'label' => __('Sitemap URL', 'wpu_redirection_extended'),
+            'type' => 'url'
+        ));
+        echo $this->get_admin_field_html('sitemap_exclude_home', array(
+            'label' => __('Exclude home', 'wpu_redirection_extended'),
+            'label_checkbox' => __('Exclude the home URL (/) from the generated CSV', 'wpu_redirection_extended'),
+            'type' => 'checkbox'
+        ));
+        echo $this->get_admin_field_html('sitemap_exclude_existing_slugs', array(
+            'label' => __('Exclude existing slugs', 'wpu_redirection_extended'),
+            'label_checkbox' => __('Exclude URLs that match an existing slug on this site', 'wpu_redirection_extended'),
+            'type' => 'checkbox'
+        ));
+        echo $this->get_admin_field_html('sitemap_exclude_existing_redirections', array(
+            'label' => __('Exclude existing redirections', 'wpu_redirection_extended'),
+            'label_checkbox' => __('Exclude URLs already configured as redirection sources', 'wpu_redirection_extended'),
+            'type' => 'checkbox'
+        ));
+        echo '</table>';
+        submit_button(__('Generate CSV', 'wpu_redirection_extended'), 'primary', 'submit_generate_csv_from_sitemap');
+
+        echo '<hr />';
         echo '<h2>' . esc_html__('Validate your CSV file', 'wpu_redirection_extended') . '</h2>';
         echo '<table class="form-table">';
         echo $this->get_admin_field_html('upload_file', array(
@@ -361,6 +387,10 @@ class WPURedirectionExtended {
 
     public function page_action__main() {
 
+        if (isset($_POST['submit_generate_csv_from_sitemap'])) {
+            $this->page_action__main__submit_generate_csv_from_sitemap();
+        }
+
         if (isset($_POST['submit_upload_csv']) || isset($_POST['submit_get_errors'])) {
             $this->page_action__main__submit_csv(isset($_POST['submit_get_errors']));
         }
@@ -372,6 +402,208 @@ class WPURedirectionExtended {
         if (isset($_POST['submit_fix_redirection_issues']) || isset($_POST['submit_get_redirection_issues'])) {
             $this->page_action__main__clean_redirections(isset($_POST['submit_get_redirection_issues']));
         }
+    }
+
+    public function page_action__main__submit_generate_csv_from_sitemap() {
+
+        $url = isset($_POST['sitemap_url']) ? esc_url_raw(trim((string) wp_unslash($_POST['sitemap_url']))) : '';
+        if (!$url) {
+            $this->set_message('sitemap_csv_error', __('Please provide a sitemap URL.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        if (!in_array($scheme, array('http', 'https'), true)) {
+            $this->set_message('sitemap_csv_error', __('The sitemap URL must use http or https.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        $max_urls = (int) apply_filters('wpu_redirection_extended__sitemap_max_urls', 50000);
+        $max_children = (int) apply_filters('wpu_redirection_extended__sitemap_max_children', 20);
+        $http_timeout = (int) apply_filters('wpu_redirection_extended__sitemap_http_timeout', 15);
+
+        @set_time_limit(120);
+
+        $raw_urls = array();
+        $limit_reached = false;
+        $fetch_error = $this->fetch_sitemap_urls($url, $raw_urls, $max_urls, $max_children, $http_timeout, $limit_reached);
+
+        if ($fetch_error) {
+            $this->set_message('sitemap_csv_error', $fetch_error, 'error');
+            return;
+        }
+
+        if (empty($raw_urls)) {
+            $this->set_message('sitemap_csv_error', __('No URLs found in the sitemap.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        /* Convert absolute URLs to relative paths and deduplicate */
+        $sources = array();
+        foreach ($raw_urls as $u) {
+            $parts = parse_url($u);
+            if (!$parts) {
+                continue;
+            }
+            $path = isset($parts['path']) && $parts['path'] !== '' ? $parts['path'] : '/';
+            if (!empty($parts['query'])) {
+                $path .= '?' . $parts['query'];
+            }
+            if (!empty($parts['fragment'])) {
+                $path .= '#' . $parts['fragment'];
+            }
+            $sources[$path] = true;
+        }
+        $sources = array_keys($sources);
+
+        $exclude_home = isset($_POST['sitemap_exclude_home']) && $_POST['sitemap_exclude_home'] == '1';
+        $exclude_slugs = isset($_POST['sitemap_exclude_existing_slugs']) && $_POST['sitemap_exclude_existing_slugs'] == '1';
+        $exclude_redirs = isset($_POST['sitemap_exclude_existing_redirections']) && $_POST['sitemap_exclude_existing_redirections'] == '1';
+
+        $existing_slugs = $exclude_slugs ? $this->get_existing_slugs() : array();
+        $existing_redirs = $exclude_redirs ? $this->get_existing_redirections() : array();
+
+        $csv_values = array();
+        foreach ($sources as $src) {
+            if ($exclude_home && ($src === '/' || $src === '')) {
+                continue;
+            }
+            if ($exclude_slugs || $exclude_redirs) {
+                $alt = $this->get_alternative_url($src);
+                if ($exclude_slugs && (in_array($src, $existing_slugs) || in_array($alt, $existing_slugs))) {
+                    continue;
+                }
+                if ($exclude_redirs && (in_array($src, $existing_redirs) || in_array($alt, $existing_redirs))) {
+                    continue;
+                }
+            }
+            $csv_values[] = array('source' => $src, 'target' => '');
+        }
+
+        if (empty($csv_values)) {
+            $this->set_message('sitemap_csv_error', __('No URLs left after filtering.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        if ($limit_reached) {
+            $this->set_message('sitemap_csv_warning', sprintf(__('Sitemap URL limit reached (%s). The CSV contains a partial result.', 'wpu_redirection_extended'), '<strong>' . $max_urls . '</strong>'), 'warning');
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        $host = $host ? preg_replace('/[^a-z0-9.-]/i', '', $host) : 'sitemap';
+        $filename = 'redirections-from-sitemap-' . $host . '-' . date('Ymd');
+
+        $this->basetoolbox->export_array_to_csv($csv_values, $filename, array(
+            'add_keys' => true,
+            'separator' => ';'
+        ));
+    }
+
+    public function fetch_sitemap_urls($url, &$urls, $max_urls, $max_children, $timeout, &$limit_reached, $depth = 0) {
+
+        if (count($urls) >= $max_urls) {
+            $limit_reached = true;
+            return '';
+        }
+
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        if (!in_array($scheme, array('http', 'https'), true)) {
+            return sprintf(__('Skipped sitemap with unsupported scheme (%s).', 'wpu_redirection_extended'), esc_html($url));
+        }
+
+        $max_response_size = (int) apply_filters('wpu_redirection_extended__sitemap_max_response_size', 50 * 1024 * 1024);
+
+        $response = wp_remote_get($url, array(
+            'timeout' => $timeout,
+            'redirection' => 5,
+            'limit_response_size' => $max_response_size,
+            'user-agent' => 'WPU Redirection Extended Sitemap Fetcher'
+        ));
+
+        if (is_wp_error($response)) {
+            return sprintf(__('Failed to fetch sitemap (%s): %s', 'wpu_redirection_extended'), esc_html($url), esc_html($response->get_error_message()));
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        if ($code !== 200) {
+            return sprintf(__('Failed to fetch sitemap (%s): HTTP %s', 'wpu_redirection_extended'), esc_html($url), $code);
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        if ($body === '') {
+            return sprintf(__('Empty response for sitemap (%s).', 'wpu_redirection_extended'), esc_html($url));
+        }
+
+        /* Gzip detection */
+        $is_gzip = false;
+        if (substr($url, -3) === '.gz') {
+            $is_gzip = true;
+        } elseif (strtolower((string) wp_remote_retrieve_header($response, 'content-encoding')) === 'gzip') {
+            $is_gzip = true;
+        } elseif (strlen($body) >= 2 && substr($body, 0, 2) === "\x1f\x8b") {
+            $is_gzip = true;
+        }
+
+        if ($is_gzip) {
+            if (!function_exists('gzdecode')) {
+                return __('Gzipped sitemap detected but PHP zlib extension is not available.', 'wpu_redirection_extended');
+            }
+            $decoded = @gzdecode($body);
+            if ($decoded === false) {
+                return sprintf(__('Failed to decode gzipped sitemap (%s).', 'wpu_redirection_extended'), esc_html($url));
+            }
+            $body = $decoded;
+        }
+
+        $previous = libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($body, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        if ($xml === false) {
+            return sprintf(__('Invalid XML in sitemap (%s).', 'wpu_redirection_extended'), esc_html($url));
+        }
+
+        $name = strtolower($xml->getName());
+
+        if ($name === 'sitemapindex') {
+            if ($depth > 0) {
+                /* Don't follow nested sitemap indexes */
+                return '';
+            }
+            $count = 0;
+            foreach ($xml->sitemap as $entry) {
+                if ($count >= $max_children) {
+                    break;
+                }
+                $loc = trim((string) $entry->loc);
+                if ($loc === '') {
+                    continue;
+                }
+                $count++;
+                $this->fetch_sitemap_urls($loc, $urls, $max_urls, $max_children, $timeout, $limit_reached, $depth + 1);
+                if ($limit_reached) {
+                    break;
+                }
+            }
+            return '';
+        }
+
+        if ($name === 'urlset') {
+            foreach ($xml->url as $entry) {
+                if (count($urls) >= $max_urls) {
+                    $limit_reached = true;
+                    break;
+                }
+                $loc = trim((string) $entry->loc);
+                if ($loc !== '') {
+                    $urls[] = $loc;
+                }
+            }
+            return '';
+        }
+
+        return sprintf(__('Unrecognized sitemap format (%s).', 'wpu_redirection_extended'), esc_html($url));
     }
 
     public function page_action__main__submit_clean_database() {
@@ -1016,6 +1248,9 @@ class WPURedirectionExtended {
             $field_html .= '<input type="file" name="' . esc_attr($field_id) . '" id="' . esc_attr($field_id) . '" />';
             break;
         case 'text':
+        case 'url':
+            $field_html .= '<input type="' . esc_attr($field['type']) . '" name="' . esc_attr($field_id) . '" id="' . esc_attr($field_id) . '" class="regular-text" />';
+            break;
         default:
             $field_html .= '<input type="text" name="' . esc_attr($field_id) . '" id="' . esc_attr($field_id) . '" class="regular-text" />';
         }
