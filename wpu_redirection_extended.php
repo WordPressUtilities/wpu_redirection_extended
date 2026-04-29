@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.13.1
+Version: 0.13.2
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.13.1';
+    private $plugin_version = '0.13.2';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -309,7 +309,7 @@ class WPURedirectionExtended {
 
     public function page_content__main() {
 
-        echo '<h2>' . __('Validate your CSV file', 'wpu_redirection_extended') . '</h2>';
+        echo '<h2>' . esc_html__('Validate your CSV file', 'wpu_redirection_extended') . '</h2>';
         echo '<table class="form-table">';
         echo $this->get_admin_field_html('upload_file', array(
             'label' => __('CSV File', 'wpu_redirection_extended'),
@@ -336,13 +336,13 @@ class WPURedirectionExtended {
             return;
         }
         echo '<hr />';
-        echo '<h2>' . __('Clean database', 'wpu_redirection_extended') . '</h2>';
-        echo '<p>' . __('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
+        echo '<h2>' . esc_html__('Clean database', 'wpu_redirection_extended') . '</h2>';
+        echo '<p>' . esc_html__('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
         submit_button(__('Clean', 'wpu_redirection_extended'), 'primary', 'submit_clean_database');
 
         echo '<hr />';
-        echo '<h2>' . __('Clean redirections', 'wpu_redirection_extended') . '</h2>';
-        echo '<p>' . __('Detect common redirection issues and clean them.', 'wpu_redirection_extended') . '</p>';
+        echo '<h2>' . esc_html__('Clean redirections', 'wpu_redirection_extended') . '</h2>';
+        echo '<p>' . esc_html__('Detect common redirection issues and clean them.', 'wpu_redirection_extended') . '</p>';
         echo '<p>';
         submit_button(__('Get a list of issues', 'wpu_redirection_extended'), 'secondary', 'submit_get_redirection_issues', false);
         echo ' ';
@@ -351,7 +351,7 @@ class WPURedirectionExtended {
 
         foreach ($this->widget_types as $widget_type => $widget_infos) {
             echo '<hr />';
-            echo '<h2>' . $widget_infos['label'] . '</h2>';
+            echo '<h2>' . esc_html($widget_infos['label']) . '</h2>';
             echo '<details>';
             echo $this->wpu_redirection_get_widget_content($widget_type);
             echo '</details>';
@@ -715,6 +715,12 @@ class WPURedirectionExtended {
     }
 
     public function get_existing_slugs() {
+        $cache_id = 'wpu_redirection_extended_existing_slugs';
+        $existing_slugs = wp_cache_get($cache_id);
+        if ($existing_slugs !== false) {
+            return $existing_slugs;
+        }
+
         $posts = get_posts(array(
             'post_type' => 'any',
             'post_status' => 'any',
@@ -751,6 +757,8 @@ class WPURedirectionExtended {
         }
 
         $existing_slugs = array_unique($existing_slugs);
+
+        wp_cache_set($cache_id, $existing_slugs, '', 60);
 
         return $existing_slugs;
     }
@@ -819,7 +827,7 @@ class WPURedirectionExtended {
                 /* Display message and stop */
                 $url = admin_url('tools.php?page=redirection.php&filterby[url]=' . urlencode($slug_search));
                 echo '<div class="notice notice-error">';
-                echo wpautop(sprintf($error_message . '<br />' . $error_message_end, $url, '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
+                echo wpautop(sprintf($error_message . '<br />' . $error_message_end, esc_url($url), '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
                 echo '</div>';
                 return;
             }
@@ -829,7 +837,7 @@ class WPURedirectionExtended {
                 /* Display message and stop */
                 $url = admin_url('tools.php?page=redirection.php&filterby[url-match]=regular');
                 echo '<div class="notice notice-error">';
-                echo wpautop(sprintf($error_message_regex . '<br />' . $error_message_end, $url, '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
+                echo wpautop(sprintf($error_message_regex . '<br />' . $error_message_end, esc_url($url), '<strong>' . wp_strip_all_tags($slug) . '</strong>'));
                 echo '</div>';
                 return;
 
@@ -902,7 +910,7 @@ class WPURedirectionExtended {
     public function wpu_redirection_get_widget_content($widget_type = '') {
         $lines = $this->get_widget_query_results($widget_type, 10, ARRAY_A);
         if (empty($lines)) {
-            return '<p>' . __('No data found.', 'wpu_redirection_extended') . '</p>';
+            return '<p>' . esc_html__('No data found.', 'wpu_redirection_extended') . '</p>';
         }
         $html = '';
         $html .= $this->basetoolbox->admin_widget_build_table($lines, array(
@@ -916,8 +924,8 @@ class WPURedirectionExtended {
             $widget_infos = isset($this->widget_types[$widget_type]) ? $this->widget_types[$widget_type] : false;
             $html .= '<p>';
             if ($widget_infos && isset($widget_infos['search_param'])) {
-                $html .= '<a class="button" href="' . admin_url('tools.php?page=redirection.php&sub=404s' . $widget_infos['search_param']) . '">';
-                $html .= __('See all errors', 'wpu_redirection_extended');
+                $html .= '<a class="button" href="' . esc_url(admin_url('tools.php?page=redirection.php&sub=404s' . $widget_infos['search_param'])) . '">';
+                $html .= esc_html__('See all errors', 'wpu_redirection_extended');
                 $html .= '</a>';
             }
             $html .= ' ' . $this->get_widget_download_button($widget_type);
@@ -928,7 +936,7 @@ class WPURedirectionExtended {
 
     public function get_widget_download_button($widget_type) {
         $download_url = wp_nonce_url(admin_url('index.php?wpu_redir_ext_download_widget=' . $widget_type), 'wpu_redir_ext_download_' . $widget_type);
-        return '<a class="button" href="' . esc_url($download_url) . '">' . __('Export CSV', 'wpu_redirection_extended') . '</a>';
+        return '<a class="button" href="' . esc_url($download_url) . '">' . esc_html__('Export CSV', 'wpu_redirection_extended') . '</a>';
     }
 
     /* ----------------------------------------------------------
