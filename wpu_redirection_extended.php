@@ -4,12 +4,12 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.14.0
+Version: 0.15.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
 Domain Path: /lang
-Requires at least: 6.7
+Requires at least: 6.2
 Requires PHP: 8.0
 Network: Optional
 License: MIT License
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.14.0';
+    private $plugin_version = '0.15.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -314,6 +314,7 @@ class WPURedirectionExtended {
         echo '<table class="form-table">';
         echo $this->get_admin_field_html('sitemap_url', array(
             'label' => __('Sitemap URL', 'wpu_redirection_extended'),
+            'description' => __('Provide the URL of a sitemap (XML or sitemap index, optionally gzipped). You can also enter just a domain — the sitemap will be auto-detected via robots.txt or common paths.', 'wpu_redirection_extended'),
             'type' => 'url'
         ));
         echo $this->get_admin_field_html('sitemap_exclude_home', array(
@@ -406,11 +407,18 @@ class WPURedirectionExtended {
 
     public function page_action__main__submit_generate_csv_from_sitemap() {
 
-        $url = isset($_POST['sitemap_url']) ? esc_url_raw(trim((string) wp_unslash($_POST['sitemap_url']))) : '';
+        $url = isset($_POST['sitemap_url']) ? trim((string) wp_unslash($_POST['sitemap_url'])) : '';
         if (!$url) {
             $this->set_message('sitemap_csv_error', __('Please provide a sitemap URL.', 'wpu_redirection_extended'), 'error');
             return;
         }
+
+        /* Auto-prefix scheme if missing */
+        if (!preg_match('#^https?://#i', $url)) {
+            $url = 'https://' . $url;
+        }
+
+        $url = esc_url_raw($url);
 
         $scheme = parse_url($url, PHP_URL_SCHEME);
         if (!in_array($scheme, array('http', 'https'), true)) {
@@ -424,13 +432,25 @@ class WPURedirectionExtended {
 
         @set_time_limit(120);
 
+        /* Discovery mode: path is empty or root-only */
+        $url_path = parse_url($url, PHP_URL_PATH);
+        $is_root = ($url_path === null || $url_path === '' || $url_path === '/');
+
         $raw_urls = array();
         $limit_reached = false;
-        $fetch_error = $this->fetch_sitemap_urls($url, $raw_urls, $max_urls, $max_children, $http_timeout, $limit_reached);
 
-        if ($fetch_error) {
-            $this->set_message('sitemap_csv_error', $fetch_error, 'error');
-            return;
+        if ($is_root) {
+            $raw_urls = $this->discover_sitemap_urls($url, $max_urls, $max_children, $http_timeout, $limit_reached);
+            if (empty($raw_urls)) {
+                $this->set_message('sitemap_csv_error', __('No sitemap could be auto-detected for this domain. Please provide the full sitemap URL.', 'wpu_redirection_extended'), 'error');
+                return;
+            }
+        } else {
+            $fetch_error = $this->fetch_sitemap_urls($url, $raw_urls, $max_urls, $max_children, $http_timeout, $limit_reached);
+            if ($fetch_error) {
+                $this->set_message('sitemap_csv_error', $fetch_error, 'error');
+                return;
+            }
         }
 
         if (empty($raw_urls)) {
@@ -499,7 +519,11 @@ class WPURedirectionExtended {
         ));
     }
 
-    public function fetch_sitemap_urls($url, &$urls, $max_urls, $max_children, $timeout, &$limit_reached, $depth = 0) {
+    public function fetch_sitemap_urls($url, &$urls, $max_urls, $max_children, $timeout, &$limit_reached, $depth = 0, $timeout_override = null) {
+
+        if ($timeout_override !== null) {
+            $timeout = (int) $timeout_override;
+        }
 
         if (count($urls) >= $max_urls) {
             $limit_reached = true;
@@ -538,7 +562,7 @@ class WPURedirectionExtended {
         $is_gzip = false;
         if (substr($url, -3) === '.gz') {
             $is_gzip = true;
-        } elseif (strtolower((string) wp_remote_retrieve_header($response, 'content-encoding')) === 'gzip') {
+        } elseif (strtolower((string) wp_remote_retrieve_header($response, 'content-encoding')) === 'gzip' && substr($body, 0, 1) !== '<') {
             $is_gzip = true;
         } elseif (strlen($body) >= 2 && substr($body, 0, 2) === "\x1f\x8b") {
             $is_gzip = true;
@@ -604,6 +628,120 @@ class WPURedirectionExtended {
         }
 
         return sprintf(__('Unrecognized sitemap format (%s).', 'wpu_redirection_extended'), esc_html($url));
+    }
+
+    /**
+     * Parse a robots.txt body and return all declared Sitemap: URLs.
+     * Relative URLs are resolved against $base_url (scheme + host).
+     *
+     * @param string $body     Raw robots.txt content.
+     * @param string $base_url Scheme + host (e.g. https://example.com).
+     * @return string[]
+     */
+    private function parse_robots_txt_sitemaps(string $body, string $base_url): array {
+        $sitemaps = array();
+        foreach (explode("\n", $body) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') {
+                continue;
+            }
+            /* Strip inline comments */
+            $hash_pos = strpos($line, '#');
+            if ($hash_pos !== false) {
+                $line = rtrim(substr($line, 0, $hash_pos));
+            }
+            if (!preg_match('/^sitemap\s*:\s*(.+)$/i', $line, $matches)) {
+                continue;
+            }
+            $candidate = trim($matches[1]);
+            if ($candidate === '') {
+                continue;
+            }
+            /* Resolve relative URLs */
+            if (!preg_match('#^https?://#i', $candidate)) {
+                $candidate = rtrim($base_url, '/') . '/' . ltrim($candidate, '/');
+            }
+            $sitemaps[] = $candidate;
+        }
+        return $sitemaps;
+    }
+
+    /**
+     * Auto-discover sitemap URLs for a domain root.
+     *
+     * @param string $domain_url   Full URL of the domain root (e.g. https://example.com).
+     * @param int    $max_urls     Maximum total URLs to collect.
+     * @param int    $max_children Maximum child sitemaps to follow.
+     * @param int    $http_timeout Normal parsing timeout (seconds).
+     * @param bool   $limit_reached Passed by reference; set to true if max_urls was hit.
+     * @return string[] Collected page URLs (empty on total failure).
+     */
+    private function discover_sitemap_urls(string $domain_url, int $max_urls, int $max_children, int $http_timeout, bool &$limit_reached): array {
+        $discovery_timeout = (int) apply_filters('wpu_redirection_extended__sitemap_discovery_timeout', 5);
+        $fallback_paths = (array) apply_filters('wpu_redirection_extended__sitemap_discovery_paths', array(
+            '/wp-sitemap.xml',
+            '/sitemap_index.xml',
+            '/sitemap.xml',
+            '/sitemap.xml.gz'
+        ));
+
+        $parsed = parse_url($domain_url);
+        $base_url = $parsed['scheme'] . '://' . $parsed['host'];
+        if (!empty($parsed['port'])) {
+            $base_url .= ':' . $parsed['port'];
+        }
+
+        $all_urls = array();
+
+        /* Step 1: try robots.txt */
+        $robots_url = rtrim($base_url, '/') . '/robots.txt';
+        $robots_response = wp_remote_get($robots_url, array(
+            'timeout' => $discovery_timeout,
+            'redirection' => 3,
+            'user-agent' => 'WPU Redirection Extended Sitemap Fetcher'
+        ));
+
+        $robots_sitemaps = array();
+        if (!is_wp_error($robots_response) && (int) wp_remote_retrieve_response_code($robots_response) === 200) {
+            $robots_body = wp_remote_retrieve_body($robots_response);
+            if ($robots_body !== '') {
+                $robots_sitemaps = $this->parse_robots_txt_sitemaps($robots_body, $base_url);
+            }
+        }
+
+        /* Step 2: fetch all sitemaps declared in robots.txt and merge */
+        foreach ($robots_sitemaps as $sitemap_url) {
+            $probe_urls = array();
+            $probe_reached = false;
+            $this->fetch_sitemap_urls($sitemap_url, $probe_urls, $max_urls - count($all_urls), $max_children, $http_timeout, $probe_reached);
+            if (!empty($probe_urls)) {
+                foreach ($probe_urls as $u) {
+                    if (!in_array($u, $all_urls, true)) {
+                        $all_urls[] = $u;
+                    }
+                    if (count($all_urls) >= $max_urls) {
+                        $limit_reached = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        if (!empty($all_urls)) {
+            return $all_urls;
+        }
+
+        /* Step 3: fallback paths — first one with ≥1 URL wins */
+        foreach ($fallback_paths as $path) {
+            $candidate_url = rtrim($base_url, '/') . '/' . ltrim((string) $path, '/');
+            $probe_urls = array();
+            $this->fetch_sitemap_urls($candidate_url, $probe_urls, $max_urls, $max_children, $discovery_timeout, $limit_reached);
+            if (!empty($probe_urls)) {
+                return $probe_urls;
+            }
+        }
+
+        return array();
     }
 
     public function page_action__main__submit_clean_database() {
@@ -1253,6 +1391,10 @@ class WPURedirectionExtended {
             break;
         default:
             $field_html .= '<input type="text" name="' . esc_attr($field_id) . '" id="' . esc_attr($field_id) . '" class="regular-text" />';
+        }
+
+        if (isset($field['description'])) {
+            $field_html .= '<p class="description"><small>' . esc_html($field['description']) . '</small></p>';
         }
 
         $html .= '<tr>';
