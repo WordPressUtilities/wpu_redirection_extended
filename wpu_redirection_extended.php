@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.15.0
+Version: 0.15.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.15.0';
+    private $plugin_version = '0.15.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -31,6 +31,7 @@ class WPURedirectionExtended {
     private $messages;
     private $adminpages;
     private $widget_types = array();
+    private $redirection_issues = array();
 
     public function __construct() {
         add_action('init', array(&$this, 'load_translation'));
@@ -985,6 +986,9 @@ class WPURedirectionExtended {
         }
 
         if ($diagnostic_only) {
+            if (!empty($this->redirection_issues)) {
+                $this->set_message('redirection_issues_list', implode('<br />', $this->redirection_issues), 'error');
+            }
             if ($issues_found == 0) {
                 $this->set_message('redirection_issues', __('No redirection issue found.', 'wpu_redirection_extended'), 'success');
             } else {
@@ -1009,7 +1013,7 @@ class WPURedirectionExtended {
         }
 
         if ($diagnostic_only) {
-            $this->set_message('redirection_issue_query_' . $redirection->id, sprintf(__('Redirection with ID %s (%s) does not allow query parameters and may cause issues.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url)), 'error');
+            $this->redirection_issues[] = sprintf(__('Redirection with ID %s (%s) does not allow query parameters and may cause issues.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url));
         } else {
             if (!isset($match_data['source']) || !is_array($match_data['source'])) {
                 $match_data['source'] = array();
@@ -1047,7 +1051,7 @@ class WPURedirectionExtended {
         }
 
         if ($diagnostic_only) {
-            $this->set_message('redirection_issue_' . $redirection->id, sprintf(__('Redirection with ID %s (%s) matches an existing slug and may cause conflicts.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url)), 'error');
+            $this->redirection_issues[] = sprintf(__('Redirection with ID %s (%s) matches an existing slug and may cause conflicts.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url));
         } else {
             $wpdb->update(
                 $wpdb->prefix . 'redirection_items',
