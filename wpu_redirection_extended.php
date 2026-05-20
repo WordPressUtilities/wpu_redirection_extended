@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.15.1
+Version: 0.15.2
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.15.1';
+    private $plugin_version = '0.15.2';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -963,8 +963,15 @@ class WPURedirectionExtended {
         $redirections = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}redirection_items WHERE status = 'enabled'");
 
         $issues_found = 0;
+        $duplicates_found = 0;
+        $duplicate_ids = $this->page_action__main__clean_redirections__duplicates($redirections, $diagnostic_only, $duplicates_found);
         $existing_slugs = $this->get_existing_slugs();
         foreach ($redirections as $redirection) {
+
+            /* Skip redirections already flagged as duplicates */
+            if (isset($duplicate_ids[$redirection->id])) {
+                continue;
+            }
 
             if (strpos($redirection->url, '?') === false) {
                 if (!$redirection->match_data) {
@@ -985,6 +992,14 @@ class WPURedirectionExtended {
 
         }
 
+        if ($duplicates_found > 0) {
+            if ($diagnostic_only) {
+                $this->set_message('redirection_duplicates', sprintf(__('%s duplicate redirections detected (same source).', 'wpu_redirection_extended'), '<strong>' . $duplicates_found . '</strong>'), 'error');
+            } else {
+                $this->set_message('redirection_duplicates', sprintf(__('Disabled %s duplicate redirections (same source).', 'wpu_redirection_extended'), '<strong>' . $duplicates_found . '</strong>'), 'success');
+            }
+        }
+
         if ($diagnostic_only) {
             if (!empty($this->redirection_issues)) {
                 $this->set_message('redirection_issues_list', implode('<br />', $this->redirection_issues), 'error');
@@ -997,6 +1012,62 @@ class WPURedirectionExtended {
         } else {
             $this->set_message('redirections_cleaned', sprintf(__('Cleaned %s redirections with potential issues.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'success');
         }
+    }
+
+    /* Detect duplicate redirections (same url + match_url) and disable extras */
+    public function page_action__main__clean_redirections__duplicates($redirections, $diagnostic_only, &$duplicates_found) {
+        global $wpdb;
+
+        $groups = array();
+        foreach ($redirections as $redirection) {
+            $key = $redirection->match_url . '|' . $redirection->url;
+            if (!isset($groups[$key])) {
+                $groups[$key] = array();
+            }
+            $groups[$key][] = $redirection;
+        }
+
+        $duplicate_ids = array();
+        foreach ($groups as $group) {
+            if (count($group) < 2) {
+                continue;
+            }
+
+            $keeper = null;
+            foreach ($group as $item) {
+                if ($item->last_count > 0 && ($keeper === null || $item->id < $keeper->id)) {
+                    $keeper = $item;
+                }
+            }
+            if ($keeper === null) {
+                foreach ($group as $item) {
+                    if ($keeper === null || $item->id < $keeper->id) {
+                        $keeper = $item;
+                    }
+                }
+            }
+
+            foreach ($group as $item) {
+                if ($item->id == $keeper->id) {
+                    continue;
+                }
+                $duplicate_ids[$item->id] = true;
+                $duplicates_found++;
+                if ($diagnostic_only) {
+                    $this->redirection_issues[] = sprintf(__('Redirection with ID %1$s (%2$s) is a duplicate of ID %3$s.', 'wpu_redirection_extended'), $item->id, esc_html($item->url), $keeper->id);
+                } else {
+                    $wpdb->update(
+                        $wpdb->prefix . 'redirection_items',
+                        array('status' => 'disabled'),
+                        array('id' => $item->id),
+                        array('%s'),
+                        array('%d')
+                    );
+                }
+            }
+        }
+
+        return $duplicate_ids;
     }
 
     /* Check if a redirection has an invalid flag query and disable it if not in diagnostic mode */
