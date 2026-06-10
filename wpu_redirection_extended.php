@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.15.2
+Version: 0.15.3
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.15.2';
+    private $plugin_version = '0.15.3';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -832,6 +832,16 @@ class WPURedirectionExtended {
             $existing_redirections = $this->get_existing_redirections();
         }
 
+        $excluded_urls = apply_filters('wpu_redirection_extended__submit_csv_excluded_urls', array(
+            '/*',
+            '/wp-content/plugins/*',
+            '/wp-content/themes/*',
+            '/wp-content/uploads/*'
+        ));
+        if (!is_array($excluded_urls)) {
+            $excluded_urls = array();
+        }
+
         $errors_list = array();
 
         while (($row = fgetcsv($handle)) !== false) {
@@ -922,6 +932,12 @@ class WPURedirectionExtended {
             /* Filter existing redirections */
             if ($filter_existing_redirections && (in_array($before, $existing_redirections) || in_array($alternative_before, $existing_redirections))) {
                 $errors_list[] = sprintf(__('Line %s: before value already exists as a redirection.', 'wpu_redirection_extended'), $line_number);
+                continue;
+            }
+
+            /* Filter excluded URLs */
+            if (in_array($before, $excluded_urls)) {
+                $errors_list[] = sprintf(__('Line %s: before value is in the excluded URLs list.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
