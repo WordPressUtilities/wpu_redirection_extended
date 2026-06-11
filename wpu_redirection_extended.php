@@ -4,13 +4,14 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.15.3
+Version: 0.15.4
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
 Domain Path: /lang
 Requires at least: 6.2
 Requires PHP: 8.0
+Requires Plugins: redirection
 Network: Optional
 License: MIT License
 License URI: https://opensource.org/licenses/MIT
@@ -21,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.15.3';
+    private $plugin_version = '0.15.4';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -811,7 +812,7 @@ class WPURedirectionExtended {
         );
 
         $file_ext = strtolower(pathinfo($_FILES['upload_file']['name'], PATHINFO_EXTENSION));
-        if (!in_array($mime_type, $allowed_mime_types) && $file_ext === 'csv') {
+        if ($file_ext != 'csv' || !in_array($mime_type, $allowed_mime_types)) {
             $this->set_message('csv_upload_error', __('The uploaded file is not a valid CSV.', 'wpu_redirection_extended'), 'error');
             return false;
         }
@@ -819,6 +820,10 @@ class WPURedirectionExtended {
         $csv_values = array();
         $line_number = 0;
         $handle = fopen($_FILES['upload_file']['tmp_name'], 'r');
+        if (!$handle) {
+            $this->set_message('csv_upload_error', __('Failed to open the uploaded file.', 'wpu_redirection_extended'), 'error');
+            return false;
+        }
 
         $filter_existing_slugs = isset($_POST['filter_existing_slugs']) && $_POST['filter_existing_slugs'] == '1';
         $existing_slugs = array();
@@ -1311,7 +1316,7 @@ class WPURedirectionExtended {
     public function slug_match_regex_redirection($slug) {
         $regexes = $this->get_existing_redirection_regex();
         foreach ($regexes as $regex) {
-            if (@preg_match('#' . $regex . '#', $slug)) {
+            if (@preg_match('#' . str_replace('#', '\#', $regex) . '#', $slug)) {
                 return true;
             }
         }
@@ -1329,31 +1334,16 @@ class WPURedirectionExtended {
         if (!$this->is_redirection_configured()) {
             return;
         }
-        /* Top 404 from bots */
-        wp_add_dashboard_widget(
-            'wpu_redirection_extended_top_404_bots',
-            __('Top 404 Errors from Bots', 'wpu_redirection_extended'),
-            function () {
-                echo $this->wpu_redirection_get_widget_content('bots');
-            }
-        );
-        /* Top 404 on files */
-        wp_add_dashboard_widget(
-            'wpu_redirection_extended_top_404_files',
-            __('Top 404 Errors on Files', 'wpu_redirection_extended'),
-            function () {
-                echo $this->wpu_redirection_get_widget_content('files');
-            }
-        );
-        /* Top 404 with UTM source */
-        wp_add_dashboard_widget(
-            'wpu_redirection_extended_top_404_utm',
-            __('Top 404 Errors with UTM Source', 'wpu_redirection_extended'),
-            function () {
-                echo $this->wpu_redirection_get_widget_content('utm');
-            }
-        );
 
+        foreach ($this->widget_types as $widget_type => $widget_infos) {
+            wp_add_dashboard_widget(
+                'wpu_redirection_extended_top_404_' . $widget_type,
+                $widget_infos['label'],
+                function () use ($widget_type) {
+                    echo $this->wpu_redirection_get_widget_content($widget_type);
+                }
+            );
+        }
     }
 
     public function get_widget_query_results($widget_type, $limit = 0, $output = OBJECT) {
@@ -1410,7 +1400,7 @@ class WPURedirectionExtended {
             return;
         }
         $widget_type = sanitize_text_field($_GET['wpu_redir_ext_download_widget']);
-        if (!in_array($widget_type, array('bots', 'files', 'utm'))) {
+        if (!isset($this->widget_types[$widget_type])) {
             return;
         }
         if (!wp_verify_nonce($_GET['_wpnonce'], 'wpu_redir_ext_download_' . $widget_type)) {
