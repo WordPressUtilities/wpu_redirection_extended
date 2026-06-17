@@ -483,6 +483,48 @@ msgstr "Voir toutes les erreurs"
 msgid "Export CSV"
 msgstr "Exporter en CSV"
 
+#: .././wpu_redirection_extended.php:1500
+msgid "Create a redirection"
+msgstr "Créer une redirection"
+
+#: .././wpu_redirection_extended.php:1501
+msgid "Close"
+msgstr "Fermer"
+
+#: .././wpu_redirection_extended.php:1503
+msgid "Target URL"
+msgstr "URL cible"
+
+#: .././wpu_redirection_extended.php:1504
+msgid "Redirect"
+msgstr "Rediriger"
+
+#: .././wpu_redirection_extended.php:1514
+msgid "You are not allowed to do this."
+msgstr "Vous n'êtes pas autorisé à faire cela."
+
+#: .././wpu_redirection_extended.php:1524
+msgid "Source or target URL is missing."
+msgstr "L'URL source ou cible est manquante."
+
+#: .././wpu_redirection_extended.php:1530
+msgid "The target cannot be the same as the source."
+msgstr "La cible ne peut pas être identique à la source."
+
+#: .././wpu_redirection_extended.php:1537
+#, php-format
+msgid "A redirection already exists for %s."
+msgstr "Une redirection existe déjà pour %s."
+
+#: .././wpu_redirection_extended.php:1543
+msgid "The Redirection plugin is not available."
+msgstr "Le plugin Redirection n'est pas disponible."
+
+#: .././wpu_redirection_extended.php:1561
+#, php-format
+msgid "Redirection created: %1$s &rarr; %2$s"
+msgstr "Redirection créée : %1$s &rarr; %2$s"
+
 #~ msgid "Export Top 404"
 #~ msgstr "Exporter le Top 404"
 

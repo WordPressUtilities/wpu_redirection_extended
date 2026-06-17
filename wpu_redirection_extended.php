@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.15.4
+Version: 0.16.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.15.4';
+    private $plugin_version = '0.16.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -58,6 +58,10 @@ class WPURedirectionExtended {
             return $this->user_level;
         });
         add_filter('rest_request_after_callbacks', array(&$this, 'extend_redirect_autocomplete'), 10, 3);
+
+        /* Front 404 quick-redirect form */
+        add_action('wp_footer', array(&$this, 'display_404_redirect_form'));
+        add_action('admin_post_wpu_redir_ext_create_404', array(&$this, 'handle_404_redirect_form'));
     }
 
     # REDIRECT AUTOCOMPLETE
@@ -281,9 +285,10 @@ class WPURedirectionExtended {
     ---------------------------------------------------------- */
 
     public function set_custom_roles() {
-        /* Set access to existing roles */
-        $this->update_role('super_editor');
-        $this->update_role('administrator');
+        $roles_to_update = apply_filters('wpu_redirection_extended__roles_to_update', array('super_editor', 'administrator'));
+        foreach ($roles_to_update as $role) {
+            $this->update_role($role);
+        }
         $this->create_custom_role();
     }
 
@@ -300,6 +305,10 @@ class WPURedirectionExtended {
     public function update_role($user_role) {
         $role = get_role($user_role);
         if (!$role) {
+            return;
+        }
+        /* Avoid a DB write on every load: only add the cap if missing */
+        if ($role->has_cap($this->user_level)) {
             return;
         }
         $role->add_cap($this->user_level, true);
@@ -1484,6 +1493,111 @@ class WPURedirectionExtended {
         $html .= '</tr>';
 
         return $html;
+    }
+
+    /* ----------------------------------------------------------
+      Front 404 quick-redirect form
+    ---------------------------------------------------------- */
+
+    /* Display a minimal redirect-creation form in the footer of 404 pages */
+    public function display_404_redirect_form() {
+        if (!is_404() || !is_user_logged_in() || !current_user_can($this->user_level)) {
+            return;
+        }
+        if (!$this->is_redirection_configured()) {
+            return;
+        }
+
+        // Source = current path without query string
+        $source = wp_parse_url(esc_url_raw($_SERVER['REQUEST_URI']), PHP_URL_PATH);
+        if (!is_string($source) || $source === '') {
+            return;
+        }
+
+        $html = '';
+        $html .= '<div id="wpu-redir-ext-404-modal" style="position:fixed;left:20px;bottom:20px;z-index:99999;width:400px;max-width:calc(100vw - 40px);box-sizing:border-box;padding:20px;background:#1d2327;color:#fff;font:14px/1.4 sans-serif;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4)">';
+        $html .= '<button type="button" onclick="document.getElementById(\'wpu-redir-ext-404-modal\').remove()" aria-label="' . esc_attr__('Close', 'wpu_redirection_extended') . '" style="position:absolute;top:8px;right:8px;width:28px;height:28px;padding:0;border:0;background:transparent;color:#fff;font-size:20px;line-height:1;cursor:pointer">&times;</button>';
+        $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:flex;flex-direction:column;gap:10px">';
+        $html .= '<input type="hidden" name="action" value="wpu_redir_ext_create_404" />';
+        $html .= wp_nonce_field('wpu_redir_ext_create_404', '_wpnonce', true, false);
+        $html .= '<strong style="font-size:15px">' . esc_html__('Create a redirection', 'wpu_redirection_extended') . '</strong>';
+        $html .= '<input type="text" name="source" value="' . esc_attr($source) . '" readonly style="padding:6px 8px;box-sizing:border-box" />';
+        $html .= '<input type="url" name="target" required placeholder="' . esc_attr__('Target URL', 'wpu_redirection_extended') . '" style="padding:6px 8px;box-sizing:border-box" />';
+        $html .= '<button type="submit" class="button button-primary" style="padding:6px 12px;cursor:pointer;color:#000 !important">' . esc_html__('Redirect', 'wpu_redirection_extended') . '</button>';
+        $html .= '</form>';
+        $html .= '</div>';
+
+        echo $html;
+    }
+
+    /* Handle the 404 quick-redirect form submission */
+    public function handle_404_redirect_form() {
+        if (!current_user_can($this->user_level)) {
+            wp_die(esc_html__('You are not allowed to do this.', 'wpu_redirection_extended'));
+        }
+        check_admin_referer('wpu_redir_ext_create_404', '_wpnonce');
+
+        $redirect_back = admin_url('tools.php?page=redirection.php');
+
+        $source = isset($_POST['source']) ? wp_parse_url(esc_url_raw(wp_unslash($_POST['source'])), PHP_URL_PATH) : '';
+        $target = isset($_POST['target']) ? esc_url_raw(wp_unslash($_POST['target'])) : '';
+
+        if (!is_string($source) || $source === '' || $target === '') {
+            $this->set_message('404_redirect_error', __('Source or target URL is missing.', 'wpu_redirection_extended'), 'error');
+            wp_safe_redirect($redirect_back);
+            exit;
+        }
+
+        if ($source === $target || $source === wp_parse_url($target, PHP_URL_PATH)) {
+            $this->set_message('404_redirect_error', __('The target cannot be the same as the source.', 'wpu_redirection_extended'), 'error');
+            wp_safe_redirect($redirect_back);
+            exit;
+        }
+
+        $existing = $this->get_existing_redirections();
+        if (in_array($source, $existing) || in_array($this->get_alternative_url($source), $existing)) {
+            $this->set_message('404_redirect_error', sprintf(__('A redirection already exists for %s.', 'wpu_redirection_extended'), esc_html($source)), 'error');
+            wp_safe_redirect($redirect_back);
+            exit;
+        }
+
+        if (!class_exists('Red_Item')) {
+            $this->set_message('404_redirect_error', __('The Redirection plugin is not available.', 'wpu_redirection_extended'), 'error');
+            wp_safe_redirect($redirect_back);
+            exit;
+        }
+
+        $result = \Red_Item::create(array(
+            'url' => $source,
+            'action_data' => array('url' => $target),
+            'match_type' => 'url',
+            'action_type' => 'url',
+            'action_code' => 301,
+            'group_id' => $this->get_default_redirection_group_id(),
+            'match_data' => array('source' => array('flag_query' => 'pass'))
+        ));
+
+        if (is_wp_error($result)) {
+            $this->set_message('404_redirect_error', $result->get_error_message(), 'error');
+        } else {
+            $this->set_message('404_redirect_success', sprintf(__('Redirection created: %1$s &rarr; %2$s', 'wpu_redirection_extended'), esc_html($source), esc_html($target)), 'success');
+        }
+
+        wp_safe_redirect($redirect_back);
+        exit;
+    }
+
+    /* Get the group id used for new redirections (Redirection monitor group, fallback first group) */
+    public function get_default_redirection_group_id() {
+        if (function_exists('red_get_options')) {
+            $options = red_get_options();
+            if (!empty($options['monitor_post'])) {
+                return intval($options['monitor_post']);
+            }
+        }
+        global $wpdb;
+        $group_id = $wpdb->get_var("SELECT id FROM {$wpdb->prefix}redirection_groups ORDER BY id ASC LIMIT 1");
+        return $group_id ? intval($group_id) : 1;
     }
 
 }
