@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: WPU Redirection Extended\n"
-"POT-Creation-Date: 2026-06-11 18:00+0200\n"
+"POT-Creation-Date: 2026-06-18 21:32+0200\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -101,44 +101,72 @@ msgstr ""
 msgid "No data available."
 msgstr "Pas de données disponibles."
 
-#: .././wpu_redirection_extended.php:139
-msgid "Enhance the Redirection plugin with additional features."
+#: .././inc/tpl/admin-page-section-clean-database.php:7
+msgid "Clean database"
+msgstr "Nettoyer la base"
+
+#: .././inc/tpl/admin-page-section-clean-database.php:8
+msgid "Delete 404 logs where redirections exist or are not useful."
 msgstr ""
-"Améliore le plugin Redirection avec des fonctionnalités supplémentaires."
+"Supprimez les logs 404 où les redirections existent ou ne sont pas utiles."
 
-#: .././wpu_redirection_extended.php:161
-msgid "Settings"
-msgstr "Réglages"
+#: .././inc/tpl/admin-page-section-clean-database.php:9
+msgid "Clean"
+msgstr "Nettoyer"
 
-#: .././wpu_redirection_extended.php:226 .././wpu_redirection_extended.php:227
-msgid "Redirection"
-msgstr "Redirection"
+#: .././inc/tpl/admin-page-section-clean-redirections.php:7
+msgid "Clean redirections"
+msgstr "Nettoyer les redirections"
 
-#: .././wpu_redirection_extended.php:234 .././wpu_redirection_extended.php:235
-msgid "Extended settings"
-msgstr "Paramètres Extended"
+#: .././inc/tpl/admin-page-section-clean-redirections.php:8
+msgid "Detect common redirection issues and clean them."
+msgstr "Identifiez les problèmes courants de redirections et corrigez-les."
 
-#: .././wpu_redirection_extended.php:249
-msgid "Top 404 Errors from Bots"
-msgstr "Top des erreurs 404 des bots"
+#: .././inc/tpl/admin-page-section-clean-redirections.php:10
+msgid "Get a list of issues"
+msgstr "Obtenir la liste des problèmes"
 
-#: .././wpu_redirection_extended.php:257
-msgid "Top 404 Errors on Files"
-msgstr "Top 404 des erreurs sur les fichiers"
+#: .././inc/tpl/admin-page-section-clean-redirections.php:12
+msgid "Fix issues"
+msgstr "Résoudre les problèmes"
 
-#: .././wpu_redirection_extended.php:269
-msgid "Top 404 Errors with UTM Source"
-msgstr "Top des erreurs 404 avec UTM"
+#: .././inc/tpl/admin-page-section-csv.php:7
+msgid "Validate your CSV file"
+msgstr "Validez votre fichier CSV"
 
-#: .././wpu_redirection_extended.php:296
-msgid "Redirection Manager"
-msgstr "Gestionnaire de redirection"
+#: .././inc/tpl/admin-page-section-csv.php:10
+msgid "CSV File"
+msgstr "Fichier CSV"
 
-#: .././wpu_redirection_extended.php:314
+#: .././inc/tpl/admin-page-section-csv.php:14
+msgid "Filter existing slugs"
+msgstr "Filtrer les slugs existants"
+
+#: .././inc/tpl/admin-page-section-csv.php:15
+msgid "Existing slugs will be removed"
+msgstr "Les slugs existants seront retirés"
+
+#: .././inc/tpl/admin-page-section-csv.php:19
+msgid "Filter existing redirections"
+msgstr "Filtrer les redirections existantes"
+
+#: .././inc/tpl/admin-page-section-csv.php:20
+msgid "Existing redirections will be removed"
+msgstr "Les redirections existantes seront supprimées"
+
+#: .././inc/tpl/admin-page-section-csv.php:25
+msgid "Get a list of errors"
+msgstr "Obtenir une liste d’erreurs"
+
+#: .././inc/tpl/admin-page-section-csv.php:27
+msgid "Get a cleaned CSV"
+msgstr "Obtenir un CSV propre"
+
+#: .././inc/tpl/admin-page-section-sitemap.php:6
 msgid "Generate CSV from sitemap"
 msgstr "Générer un fichier CSV à partir du plan du site"
 
-#: .././wpu_redirection_extended.php:315
+#: .././inc/tpl/admin-page-section-sitemap.php:7
 msgid ""
 "Provide the URL of an external sitemap (XML or sitemap index, optionally "
 "gzipped). A CSV will be generated with one source URL per line and an empty "
@@ -148,11 +176,11 @@ msgstr ""
 "site, éventuellement compressé au format gzip). Un fichier CSV sera généré, "
 "contenant une URL source par ligne et une colonne de destination vide."
 
-#: .././wpu_redirection_extended.php:318
+#: .././inc/tpl/admin-page-section-sitemap.php:10
 msgid "Sitemap URL"
 msgstr "URL du plan du site"
 
-#: .././wpu_redirection_extended.php:319
+#: .././inc/tpl/admin-page-section-sitemap.php:11
 msgid ""
 "Provide the URL of a sitemap (XML or sitemap index, optionally gzipped). You "
 "can also enter just a domain — the sitemap will be auto-detected via "
@@ -163,104 +191,96 @@ msgstr ""
 "uniquement un nom de domaine : le plan du site sera détecté automatiquement "
 "via le fichier robots.txt ou les chemins d'accès courants."
 
-#: .././wpu_redirection_extended.php:323
+#: .././inc/tpl/admin-page-section-sitemap.php:15
 msgid "Exclude home"
 msgstr "Exclure la page d'accueil"
 
-#: .././wpu_redirection_extended.php:324
+#: .././inc/tpl/admin-page-section-sitemap.php:16
 msgid "Exclude the home URL (/) from the generated CSV"
 msgstr "Exclure l'URL d'accueil (/) du fichier CSV généré"
 
-#: .././wpu_redirection_extended.php:328
+#: .././inc/tpl/admin-page-section-sitemap.php:20
 msgid "Exclude existing slugs"
 msgstr "Exclure les slugs existants"
 
-#: .././wpu_redirection_extended.php:329
+#: .././inc/tpl/admin-page-section-sitemap.php:21
 msgid "Exclude URLs that match an existing slug on this site"
 msgstr "Exclure les URL qui correspondent à un slug existant sur ce site"
 
-#: .././wpu_redirection_extended.php:333
+#: .././inc/tpl/admin-page-section-sitemap.php:25
 msgid "Exclude existing redirections"
 msgstr "Exclure les redirections existantes"
 
-#: .././wpu_redirection_extended.php:334
+#: .././inc/tpl/admin-page-section-sitemap.php:26
 msgid "Exclude URLs already configured as redirection sources"
 msgstr "Exclure les URL déjà configurées comme sources de redirection"
 
-#: .././wpu_redirection_extended.php:338
+#: .././inc/tpl/admin-page-section-sitemap.php:30
 msgid "Generate CSV"
 msgstr "Générer un fichier CSV"
 
-#: .././wpu_redirection_extended.php:341
-msgid "Validate your CSV file"
-msgstr "Validez votre fichier CSV"
+#: .././inc/tpl/front-404-redirect-form.php:8
+msgid "Close"
+msgstr "Fermer"
 
-#: .././wpu_redirection_extended.php:344
-msgid "CSV File"
-msgstr "Fichier CSV"
+#: .././inc/tpl/front-404-redirect-form.php:12
+msgid "Create a redirection"
+msgstr "Créer une redirection"
 
-#: .././wpu_redirection_extended.php:348
-msgid "Filter existing slugs"
-msgstr "Filtrer les slugs existants"
+#: .././inc/tpl/front-404-redirect-form.php:14
+msgid "Target URL"
+msgstr "URL cible"
 
-#: .././wpu_redirection_extended.php:349
-msgid "Existing slugs will be removed"
-msgstr "Les slugs existants seront retirés"
+#: .././inc/tpl/front-404-redirect-form.php:18
+msgid "Suggestions"
+msgstr "Suggestions"
 
-#: .././wpu_redirection_extended.php:353
-msgid "Filter existing redirections"
-msgstr "Filtrer les redirections existantes"
+#: .././inc/tpl/front-404-redirect-form.php:26
+msgid "Redirect"
+msgstr "Rediriger"
 
-#: .././wpu_redirection_extended.php:354
-msgid "Existing redirections will be removed"
-msgstr "Les redirections existantes seront supprimées"
-
-#: .././wpu_redirection_extended.php:359
-msgid "Get a list of errors"
-msgstr "Obtenir une liste d’erreurs"
-
-#: .././wpu_redirection_extended.php:361
-msgid "Get a cleaned CSV"
-msgstr "Obtenir un CSV propre"
-
-#: .././wpu_redirection_extended.php:368
-msgid "Clean database"
-msgstr "Nettoyer la base"
-
-#: .././wpu_redirection_extended.php:369
-msgid "Delete 404 logs where redirections exist or are not useful."
+#: .././wpu_redirection_extended.php:143
+msgid "Enhance the Redirection plugin with additional features."
 msgstr ""
-"Supprimez les logs 404 où les redirections existent ou ne sont pas utiles."
+"Améliore le plugin Redirection avec des fonctionnalités supplémentaires."
 
-#: .././wpu_redirection_extended.php:370
-msgid "Clean"
-msgstr "Nettoyer"
+#: .././wpu_redirection_extended.php:165
+msgid "Settings"
+msgstr "Réglages"
 
-#: .././wpu_redirection_extended.php:373
-msgid "Clean redirections"
-msgstr "Nettoyer les redirections"
+#: .././wpu_redirection_extended.php:230 .././wpu_redirection_extended.php:231
+msgid "Redirection"
+msgstr "Redirection"
 
-#: .././wpu_redirection_extended.php:374
-msgid "Detect common redirection issues and clean them."
-msgstr "Identifiez les problèmes courants de redirections et corrigez-les."
+#: .././wpu_redirection_extended.php:238 .././wpu_redirection_extended.php:239
+msgid "Extended settings"
+msgstr "Paramètres Extended"
 
-#: .././wpu_redirection_extended.php:376
-msgid "Get a list of issues"
-msgstr "Obtenir la liste des problèmes"
+#: .././wpu_redirection_extended.php:253
+msgid "Top 404 Errors from Bots"
+msgstr "Top des erreurs 404 des bots"
 
-#: .././wpu_redirection_extended.php:378
-msgid "Fix issues"
-msgstr "Résoudre les problèmes"
+#: .././wpu_redirection_extended.php:261
+msgid "Top 404 Errors on Files"
+msgstr "Top 404 des erreurs sur les fichiers"
 
-#: .././wpu_redirection_extended.php:414
+#: .././wpu_redirection_extended.php:273
+msgid "Top 404 Errors with UTM Source"
+msgstr "Top des erreurs 404 avec UTM"
+
+#: .././wpu_redirection_extended.php:301
+msgid "Redirection Manager"
+msgstr "Gestionnaire de redirection"
+
+#: .././wpu_redirection_extended.php:357
 msgid "Please provide a sitemap URL."
 msgstr "Veuillez indiquer l'URL du plan du site."
 
-#: .././wpu_redirection_extended.php:427
+#: .././wpu_redirection_extended.php:370
 msgid "The sitemap URL must use http or https."
 msgstr "L'URL du plan du site doit commencer par http ou https."
 
-#: .././wpu_redirection_extended.php:447
+#: .././wpu_redirection_extended.php:390
 msgid ""
 "No sitemap could be auto-detected for this domain. Please provide the full "
 "sitemap URL."
@@ -268,150 +288,150 @@ msgstr ""
 "Aucun plan du site n'a pu être détecté automatiquement pour ce domaine. "
 "Veuillez indiquer l'URL complète du plan du site."
 
-#: .././wpu_redirection_extended.php:459
+#: .././wpu_redirection_extended.php:402
 msgid "No URLs found in the sitemap."
 msgstr "Aucune URL n'a été trouvée dans le plan du site."
 
-#: .././wpu_redirection_extended.php:506
+#: .././wpu_redirection_extended.php:449
 msgid "No URLs left after filtering."
 msgstr "Il ne reste plus aucune URL après le filtrage."
 
-#: .././wpu_redirection_extended.php:511
+#: .././wpu_redirection_extended.php:454
 #, php-format
 msgid "Sitemap URL limit reached (%s). The CSV contains a partial result."
 msgstr ""
 "Limite du nombre d'URL du plan du site atteinte (%s). Le fichier CSV "
 "contient un résultat partiel."
 
-#: .././wpu_redirection_extended.php:537
+#: .././wpu_redirection_extended.php:480
 #, php-format
 msgid "Skipped sitemap with unsupported scheme (%s)."
 msgstr "Plan du site ignoré en raison d'un schéma non pris en charge (%s)."
 
-#: .././wpu_redirection_extended.php:550
+#: .././wpu_redirection_extended.php:493
 #, php-format
 msgid "Failed to fetch sitemap (%s): %s"
 msgstr "Échec de la récupération du plan du site (%s) : %s"
 
-#: .././wpu_redirection_extended.php:555
+#: .././wpu_redirection_extended.php:498
 #, php-format
 msgid "Failed to fetch sitemap (%s): HTTP %s"
 msgstr "Échec de la récupération du plan du site (%s) : HTTP %s"
 
-#: .././wpu_redirection_extended.php:560
+#: .././wpu_redirection_extended.php:503
 #, php-format
 msgid "Empty response for sitemap (%s)."
 msgstr "Réponse vide pour le plan du site (%s)."
 
-#: .././wpu_redirection_extended.php:575
+#: .././wpu_redirection_extended.php:518
 msgid "Gzipped sitemap detected but PHP zlib extension is not available."
 msgstr ""
 "Un plan du site compressé au format Gzip a été détecté, mais l'extension "
 "zlib de PHP n'est pas disponible."
 
-#: .././wpu_redirection_extended.php:579
+#: .././wpu_redirection_extended.php:522
 #, php-format
 msgid "Failed to decode gzipped sitemap (%s)."
 msgstr "Échec du décodage du plan du site compressé au format gzip (%s)."
 
-#: .././wpu_redirection_extended.php:590
+#: .././wpu_redirection_extended.php:533
 #, php-format
 msgid "Invalid XML in sitemap (%s)."
 msgstr "XML non valide dans le plan du site (%s)."
 
-#: .././wpu_redirection_extended.php:632
+#: .././wpu_redirection_extended.php:575
 #, php-format
 msgid "Unrecognized sitemap format (%s)."
 msgstr "Format de plan du site non reconnu (%s)."
 
-#: .././wpu_redirection_extended.php:754 .././wpu_redirection_extended.php:980
+#: .././wpu_redirection_extended.php:697 .././wpu_redirection_extended.php:923
 msgid "Redirection plugin is not configured."
 msgstr "Le plugin de redirection n’est pas configuré."
 
-#: .././wpu_redirection_extended.php:788
+#: .././wpu_redirection_extended.php:731
 msgid "No invalid 404 log entries found."
 msgstr "Aucune entrée de journal 404 invalide trouvée."
 
-#: .././wpu_redirection_extended.php:791
+#: .././wpu_redirection_extended.php:734
 #, php-format
 msgid "Deleted %s log entries."
 msgstr "%s entrées de journal ont été supprimées."
 
-#: .././wpu_redirection_extended.php:797
+#: .././wpu_redirection_extended.php:740
 msgid "No file uploaded or upload error."
 msgstr "Aucun fichier téléchargé ni erreur de téléversement."
 
-#: .././wpu_redirection_extended.php:816
+#: .././wpu_redirection_extended.php:759
 msgid "The uploaded file is not a valid CSV."
 msgstr "Le fichier téléchargé n’est pas un CSV valide."
 
-#: .././wpu_redirection_extended.php:824
+#: .././wpu_redirection_extended.php:767
 msgid "Failed to open the uploaded file."
 msgstr "Impossible d'ouvrir le fichier téléchargé."
 
-#: .././wpu_redirection_extended.php:878
+#: .././wpu_redirection_extended.php:821
 #, php-format
 msgid "Line %s: contains spaces."
 msgstr "Ligne %s : contient des espaces."
 
-#: .././wpu_redirection_extended.php:913
+#: .././wpu_redirection_extended.php:856
 #, php-format
 msgid "Line %s: before and after values are the same."
 msgstr "Ligne %s : les valeurs avant et après sont identiques."
 
-#: .././wpu_redirection_extended.php:919
+#: .././wpu_redirection_extended.php:862
 #, php-format
 msgid "Line %s: before value is /."
 msgstr "Ligne %s : la valeur avant est /."
 
-#: .././wpu_redirection_extended.php:925
+#: .././wpu_redirection_extended.php:868
 #, php-format
 msgid "Line %s: before and after values only differ by a trailing slash."
 msgstr ""
 "Ligne %s : les valeurs avant et après ne diffèrent que par un slash de fin."
 
-#: .././wpu_redirection_extended.php:933
+#: .././wpu_redirection_extended.php:876
 #, php-format
 msgid "Line %s: before value already exists as a slug."
 msgstr "Ligne %s : la valeur avant existe déjà en tant que slug."
 
-#: .././wpu_redirection_extended.php:939
+#: .././wpu_redirection_extended.php:882
 #, php-format
 msgid "Line %s: before value already exists as a redirection."
 msgstr "Ligne %s : la valeur avant existe déjà comme redirection."
 
-#: .././wpu_redirection_extended.php:945
+#: .././wpu_redirection_extended.php:888
 #, php-format
 msgid "Line %s: before value is in the excluded URLs list."
 msgstr "Ligne %s : la valeur qui précède est dans la liste des URL exclues."
 
-#: .././wpu_redirection_extended.php:958
+#: .././wpu_redirection_extended.php:901
 msgid "No errors found in the uploaded file."
 msgstr "Aucune erreur trouvée dans le fichier téléchargé."
 
-#: .././wpu_redirection_extended.php:961
+#: .././wpu_redirection_extended.php:904
 msgid "Errors found in the uploaded file :"
 msgstr "Erreurs trouvées dans le fichier téléchargé :"
 
-#: .././wpu_redirection_extended.php:967
+#: .././wpu_redirection_extended.php:910
 msgid "No valid redirections found in the uploaded file."
 msgstr "Aucune redirection valide trouvée dans le fichier téléchargé."
 
-#: .././wpu_redirection_extended.php:1018
+#: .././wpu_redirection_extended.php:961
 #, php-format
 msgid "%s duplicate redirections detected (same source)."
 msgstr "%s redirections en double détectées (même source)."
 
-#: .././wpu_redirection_extended.php:1020
+#: .././wpu_redirection_extended.php:963
 #, php-format
 msgid "Disabled %s duplicate redirections (same source)."
 msgstr "%s redirections en double désactivées (même source)."
 
-#: .././wpu_redirection_extended.php:1029
+#: .././wpu_redirection_extended.php:972
 msgid "No redirection issue found."
 msgstr "Aucun problème de redirection n'a été détecté."
 
-#: .././wpu_redirection_extended.php:1031
+#: .././wpu_redirection_extended.php:974
 #, php-format
 msgid ""
 "%s redirections have issues that may cause conflicts or unexpected behavior."
@@ -419,17 +439,17 @@ msgstr ""
 "%s redirections présentent des problèmes susceptibles d'entraîner des "
 "conflits ou un comportement inattendu."
 
-#: .././wpu_redirection_extended.php:1034
+#: .././wpu_redirection_extended.php:977
 #, php-format
 msgid "Cleaned %s redirections with potential issues."
 msgstr "Nettoyage de %s redirections présentant des problèmes potentiels."
 
-#: .././wpu_redirection_extended.php:1078
+#: .././wpu_redirection_extended.php:1021
 #, php-format
 msgid "Redirection with ID %1$s (%2$s) is a duplicate of ID %3$s."
 msgstr "La redirection avec l'ID %1$s (%2$s) est un doublon de l'ID %3$s."
 
-#: .././wpu_redirection_extended.php:1108
+#: .././wpu_redirection_extended.php:1051
 #, php-format
 msgid ""
 "Redirection with ID %s (%s) does not allow query parameters and may cause "
@@ -438,7 +458,7 @@ msgstr ""
 "La redirection avec l'ID %s (%s) n'autorise pas les paramètres de requête et "
 "peut entraîner des problèmes."
 
-#: .././wpu_redirection_extended.php:1146
+#: .././wpu_redirection_extended.php:1089
 #, php-format
 msgid ""
 "Redirection with ID %s (%s) matches an existing slug and may cause conflicts."
@@ -446,81 +466,65 @@ msgstr ""
 "La redirection avec l'ID %s (%s) correspond à un slug existant et peut "
 "entraîner des conflits."
 
-#: .././wpu_redirection_extended.php:1281
+#: .././wpu_redirection_extended.php:1343
 #, php-format
 msgid ""
 "<a href=\"%s\">A redirection</a> is configured for the current URL : %s."
 msgstr ""
 "<a href=\"%s\">Une redirection</a> est configurée pour l’URL actuelle : %s."
 
-#: .././wpu_redirection_extended.php:1282
+#: .././wpu_redirection_extended.php:1344
 #, php-format
 msgid "<a href=\"%s\">A regex redirection</a> matches the current URL : %s."
 msgstr ""
 "<a href=\"%s\">Une redirection regex</a> correspond à l’URL actuelle : %s."
 
-#: .././wpu_redirection_extended.php:1283
+#: .././wpu_redirection_extended.php:1345
 msgid "You won’t be able to access the content."
 msgstr "Vous ne pourrez pas accéder au contenu."
 
-#: .././wpu_redirection_extended.php:1364
+#: .././wpu_redirection_extended.php:1426
 msgid "No data found."
 msgstr "Aucune donnée n'a été trouvée."
 
-#: .././wpu_redirection_extended.php:1369
+#: .././wpu_redirection_extended.php:1431
 msgid "Hits"
 msgstr "Vues"
 
-#: .././wpu_redirection_extended.php:1370
+#: .././wpu_redirection_extended.php:1432
 msgid "URL"
 msgstr "URL"
 
-#: .././wpu_redirection_extended.php:1379
+#: .././wpu_redirection_extended.php:1441
 msgid "See all errors"
 msgstr "Voir toutes les erreurs"
 
-#: .././wpu_redirection_extended.php:1390
+#: .././wpu_redirection_extended.php:1452
 msgid "Export CSV"
 msgstr "Exporter en CSV"
 
-#: .././wpu_redirection_extended.php:1500
-msgid "Create a redirection"
-msgstr "Créer une redirection"
-
-#: .././wpu_redirection_extended.php:1501
-msgid "Close"
-msgstr "Fermer"
-
-#: .././wpu_redirection_extended.php:1503
-msgid "Target URL"
-msgstr "URL cible"
-
-#: .././wpu_redirection_extended.php:1504
-msgid "Redirect"
-msgstr "Rediriger"
-
-#: .././wpu_redirection_extended.php:1514
+#: .././wpu_redirection_extended.php:1578
 msgid "You are not allowed to do this."
 msgstr "Vous n'êtes pas autorisé à faire cela."
 
-#: .././wpu_redirection_extended.php:1524
+#: .././wpu_redirection_extended.php:1588
 msgid "Source or target URL is missing."
 msgstr "L'URL source ou cible est manquante."
 
-#: .././wpu_redirection_extended.php:1530
+#: .././wpu_redirection_extended.php:1594
 msgid "The target cannot be the same as the source."
 msgstr "La cible ne peut pas être identique à la source."
 
-#: .././wpu_redirection_extended.php:1537
+#: .././wpu_redirection_extended.php:1601
 #, php-format
 msgid "A redirection already exists for %s."
 msgstr "Une redirection existe déjà pour %s."
 
-#: .././wpu_redirection_extended.php:1543
+#: .././wpu_redirection_extended.php:1607
 msgid "The Redirection plugin is not available."
 msgstr "Le plugin Redirection n'est pas disponible."
 
-#: .././wpu_redirection_extended.php:1561
+#: .././wpu_redirection_extended.php:1625
 #, php-format
 msgid "Redirection created: %1$s &rarr; %2$s"
 msgstr "Redirection créée : %1$s &rarr; %2$s"

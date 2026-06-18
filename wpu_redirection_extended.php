@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.16.0
+Version: 0.17.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.16.0';
+    private $plugin_version = '0.17.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -319,82 +319,16 @@ class WPURedirectionExtended {
     ---------------------------------------------------------- */
 
     public function page_content__main() {
-
-        echo '<h2>' . esc_html__('Generate CSV from sitemap', 'wpu_redirection_extended') . '</h2>';
-        echo '<p>' . esc_html__('Provide the URL of an external sitemap (XML or sitemap index, optionally gzipped). A CSV will be generated with one source URL per line and an empty target column.', 'wpu_redirection_extended') . '</p>';
-        echo '<table class="form-table">';
-        echo $this->get_admin_field_html('sitemap_url', array(
-            'label' => __('Sitemap URL', 'wpu_redirection_extended'),
-            'description' => __('Provide the URL of a sitemap (XML or sitemap index, optionally gzipped). You can also enter just a domain — the sitemap will be auto-detected via robots.txt or common paths.', 'wpu_redirection_extended'),
-            'type' => 'url'
-        ));
-        echo $this->get_admin_field_html('sitemap_exclude_home', array(
-            'label' => __('Exclude home', 'wpu_redirection_extended'),
-            'label_checkbox' => __('Exclude the home URL (/) from the generated CSV', 'wpu_redirection_extended'),
-            'type' => 'checkbox'
-        ));
-        echo $this->get_admin_field_html('sitemap_exclude_existing_slugs', array(
-            'label' => __('Exclude existing slugs', 'wpu_redirection_extended'),
-            'label_checkbox' => __('Exclude URLs that match an existing slug on this site', 'wpu_redirection_extended'),
-            'type' => 'checkbox'
-        ));
-        echo $this->get_admin_field_html('sitemap_exclude_existing_redirections', array(
-            'label' => __('Exclude existing redirections', 'wpu_redirection_extended'),
-            'label_checkbox' => __('Exclude URLs already configured as redirection sources', 'wpu_redirection_extended'),
-            'type' => 'checkbox'
-        ));
-        echo '</table>';
-        submit_button(__('Generate CSV', 'wpu_redirection_extended'), 'primary', 'submit_generate_csv_from_sitemap');
-
-        echo '<hr />';
-        echo '<h2>' . esc_html__('Validate your CSV file', 'wpu_redirection_extended') . '</h2>';
-        echo '<table class="form-table">';
-        echo $this->get_admin_field_html('upload_file', array(
-            'label' => __('CSV File', 'wpu_redirection_extended'),
-            'type' => 'upload'
-        ));
-        echo $this->get_admin_field_html('filter_existing_slugs', array(
-            'label' => __('Filter existing slugs', 'wpu_redirection_extended'),
-            'label_checkbox' => __('Existing slugs will be removed', 'wpu_redirection_extended'),
-            'type' => 'checkbox'
-        ));
-        echo $this->get_admin_field_html('filter_existing_redirections', array(
-            'label' => __('Filter existing redirections', 'wpu_redirection_extended'),
-            'label_checkbox' => __('Existing redirections will be removed', 'wpu_redirection_extended'),
-            'type' => 'checkbox'
-        ));
-        echo '</table>';
-        echo '<p>';
-        submit_button(__('Get a list of errors', 'wpu_redirection_extended'), 'secondary', 'submit_get_errors', false);
-        echo ' ';
-        submit_button(__('Get a cleaned CSV', 'wpu_redirection_extended'), 'primary', 'submit_upload_csv', false);
-        echo '</p>';
+        include __DIR__ . '/inc/tpl/admin-page-section-sitemap.php';
+        include __DIR__ . '/inc/tpl/admin-page-section-csv.php';
 
         if (!$this->is_redirection_configured()) {
             return;
         }
-        echo '<hr />';
-        echo '<h2>' . esc_html__('Clean database', 'wpu_redirection_extended') . '</h2>';
-        echo '<p>' . esc_html__('Delete 404 logs where redirections exist or are not useful.', 'wpu_redirection_extended') . '</p>';
-        submit_button(__('Clean', 'wpu_redirection_extended'), 'primary', 'submit_clean_database');
 
-        echo '<hr />';
-        echo '<h2>' . esc_html__('Clean redirections', 'wpu_redirection_extended') . '</h2>';
-        echo '<p>' . esc_html__('Detect common redirection issues and clean them.', 'wpu_redirection_extended') . '</p>';
-        echo '<p>';
-        submit_button(__('Get a list of issues', 'wpu_redirection_extended'), 'secondary', 'submit_get_redirection_issues', false);
-        echo ' ';
-        submit_button(__('Fix issues', 'wpu_redirection_extended'), 'primary', 'submit_fix_redirection_issues', false);
-        echo '</p>';
-
-        foreach ($this->widget_types as $widget_type => $widget_infos) {
-            echo '<hr />';
-            echo '<h2>' . esc_html($widget_infos['label']) . '</h2>';
-            echo '<details>';
-            echo $this->wpu_redirection_get_widget_content($widget_type);
-            echo '</details>';
-        }
-
+        include __DIR__ . '/inc/tpl/admin-page-section-clean-database.php';
+        include __DIR__ . '/inc/tpl/admin-page-section-clean-redirections.php';
+        include __DIR__ . '/inc/tpl/admin-page-section-widgets.php';
     }
 
     public function page_action__main() {
@@ -1239,6 +1173,125 @@ class WPURedirectionExtended {
     }
 
     /* ----------------------------------------------------------
+      Suggest existing slugs that resemble a (404) URI
+    ---------------------------------------------------------- */
+
+    /* Return existing slugs ranked by word-similarity to a given URI.
+       Bag-of-words matching with fuzzy per-token comparison, scored
+       with a symmetric Dice/F1 coverage. Returns [['url','score'], ...]. */
+    public function suggest_redirections_for_uri($uri, $limit = 5, $min_score = null) {
+        if ($min_score === null) {
+            $min_score = (float) apply_filters('wpu_redirection_extended__suggest_min_score', 0.3);
+        }
+
+        $uri_path = wp_parse_url($uri, PHP_URL_PATH);
+        if (!is_string($uri_path) || $uri_path === '') {
+            return array();
+        }
+        $uri_tokens = $this->tokenize_url_string($uri_path);
+        if (empty($uri_tokens)) {
+            return array();
+        }
+
+        $seen = array();
+        $results = array();
+        foreach ($this->get_existing_slugs() as $slug) {
+            $tokens = $this->tokenize_url_string($slug);
+            if (empty($tokens)) {
+                continue;
+            }
+
+            /* Dedupe candidates sharing the same canonical token set
+               (e.g. trailing-slash variants from get_existing_slugs) */
+            sort($tokens);
+            $key = implode(' ', $tokens);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $score = $this->score_token_sets($uri_tokens, $tokens);
+            if ($score < $min_score) {
+                continue;
+            }
+            $results[] = array('url' => $slug, 'score' => round($score, 4));
+        }
+
+        usort($results, function ($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+
+        return array_slice($results, 0, max(0, (int) $limit));
+    }
+
+    /* Split a URL/path into a deduped set of normalized word tokens */
+    public function tokenize_url_string($str) {
+        $str = strtolower(remove_accents(urldecode((string) $str)));
+        /* Split letter/digit boundaries so "ref123" -> "ref" "123" */
+        $str = preg_replace('/([a-z])([0-9])/', '$1 $2', $str);
+        $str = preg_replace('/([0-9])([a-z])/', '$1 $2', $str);
+        $tokens = preg_split('/[^a-z0-9]+/', $str, -1, PREG_SPLIT_NO_EMPTY);
+
+        $drop = array('html', 'htm', 'php', 'asp', 'aspx', 'jsp', 'shtml', 'index');
+        $out = array();
+        foreach ($tokens as $token) {
+            if (strlen($token) <= 1 || in_array($token, $drop, true)) {
+                continue;
+            }
+            $out[] = $token;
+        }
+        return array_values(array_unique($out));
+    }
+
+    /* F-beta similarity between the 404 token set ($a) and a candidate ($b).
+       beta < 1 favours precision (candidate identity present in the 404)
+       over recall, so directory noise in the 404 path doesn't sink the score. */
+    public function score_token_sets($a, $b) {
+        $recall = $this->token_set_coverage($a, $b);
+        $precision = $this->token_set_coverage($b, $a);
+        if ($precision + $recall <= 0) {
+            return 0.0;
+        }
+        $beta = (float) apply_filters('wpu_redirection_extended__suggest_beta', 0.5);
+        $beta2 = $beta * $beta;
+        return ((1 + $beta2) * $precision * $recall) / ($beta2 * $precision + $recall);
+    }
+
+    /* Length-weighted best-match coverage of $from against the $to set, so
+       short navigation tokens (de, ml, cms) weigh less than substantial words */
+    private function token_set_coverage($from, $to) {
+        if (empty($from)) {
+            return 0.0;
+        }
+        $sum = 0.0;
+        $total = 0;
+        foreach ($from as $token) {
+            $len = strlen($token);
+            $sum += $this->best_token_match($token, $to) * $len;
+            $total += $len;
+        }
+        return $total > 0 ? $sum / $total : 0.0;
+    }
+
+    /* Best fuzzy match of a token against a set: 1.0 if equal, else the
+       similar_text ratio when it clears the threshold, otherwise 0 */
+    private function best_token_match($token, $set) {
+        $best = 0.0;
+        foreach ($set as $other) {
+            if ($token === $other) {
+                return 1.0;
+            }
+            $pct = 0.0;
+            similar_text($token, $other, $pct);
+            $ratio = $pct / 100;
+            if ($ratio > $best) {
+                $best = $ratio;
+            }
+        }
+        return $best >= 0.7 ? $best : 0.0;
+    }
+
+    /* ----------------------------------------------------------
       Admin notice if a redirection exists for the current URL slug
     ---------------------------------------------------------- */
 
@@ -1514,20 +1567,9 @@ class WPURedirectionExtended {
             return;
         }
 
-        $html = '';
-        $html .= '<div id="wpu-redir-ext-404-modal" style="position:fixed;left:20px;bottom:20px;z-index:99999;width:400px;max-width:calc(100vw - 40px);box-sizing:border-box;padding:20px;background:#1d2327;color:#fff;font:14px/1.4 sans-serif;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4)">';
-        $html .= '<button type="button" onclick="document.getElementById(\'wpu-redir-ext-404-modal\').remove()" aria-label="' . esc_attr__('Close', 'wpu_redirection_extended') . '" style="position:absolute;top:8px;right:8px;width:28px;height:28px;padding:0;border:0;background:transparent;color:#fff;font-size:20px;line-height:1;cursor:pointer">&times;</button>';
-        $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:flex;flex-direction:column;gap:10px">';
-        $html .= '<input type="hidden" name="action" value="wpu_redir_ext_create_404" />';
-        $html .= wp_nonce_field('wpu_redir_ext_create_404', '_wpnonce', true, false);
-        $html .= '<strong style="font-size:15px">' . esc_html__('Create a redirection', 'wpu_redirection_extended') . '</strong>';
-        $html .= '<input type="text" name="source" value="' . esc_attr($source) . '" readonly style="padding:6px 8px;box-sizing:border-box" />';
-        $html .= '<input type="url" name="target" required placeholder="' . esc_attr__('Target URL', 'wpu_redirection_extended') . '" style="padding:6px 8px;box-sizing:border-box" />';
-        $html .= '<button type="submit" class="button button-primary" style="padding:6px 12px;cursor:pointer;color:#000 !important">' . esc_html__('Redirect', 'wpu_redirection_extended') . '</button>';
-        $html .= '</form>';
-        $html .= '</div>';
+        $suggestions = $this->suggest_redirections_for_uri($source);
 
-        echo $html;
+        include __DIR__ . '/inc/tpl/front-404-redirect-form.php';
     }
 
     /* Handle the 404 quick-redirect form submission */
