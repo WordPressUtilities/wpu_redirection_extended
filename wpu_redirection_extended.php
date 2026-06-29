@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.17.0
+Version: 0.17.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.17.0';
+    private $plugin_version = '0.17.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -791,8 +791,9 @@ class WPURedirectionExtended {
         }
 
         $errors_list = array();
+        $seen_before = array();
 
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
             $line_number++;
 
             /* Ensure CSV format is consistent */
@@ -870,6 +871,17 @@ class WPURedirectionExtended {
             }
 
             $alternative_before = $this->get_alternative_url($before);
+
+            /* Filter duplicates within CSV */
+            if (in_array($before, $seen_before) || in_array($alternative_before, $seen_before)) {
+                $errors_list[] = sprintf(__('Line %s: before value is a duplicate within the CSV.', 'wpu_redirection_extended'), $line_number);
+                continue;
+            }
+
+            $seen_before[] = $before;
+            if ($alternative_before !== $before) {
+                $seen_before[] = $alternative_before;
+            }
 
             /* Filter existing slugs */
             if ($filter_existing_slugs && (in_array($before, $existing_slugs) || in_array($alternative_before, $existing_slugs))) {

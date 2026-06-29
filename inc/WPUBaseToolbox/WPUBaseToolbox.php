@@ -4,7 +4,7 @@ namespace wpu_redirection_extended;
 /*
 Class Name: WPU Base Toolbox
 Description: Cool helpers for WordPress Plugins
-Version: 0.24.1
+Version: 0.25.1
 Class URI: https://github.com/WordPressUtilities/wpubaseplugin
 Author: Darklg
 Author URI: https://darklg.me/
@@ -15,7 +15,7 @@ License URI: https://opensource.org/licenses/MIT
 defined('ABSPATH') || die;
 
 class WPUBaseToolbox {
-    private $plugin_version = '0.24.1';
+    private $plugin_version = '0.25.1';
     private $args = array();
     private $missing_plugins = array();
     private $invalid_plugins_versions = array();
@@ -620,6 +620,56 @@ class WPUBaseToolbox {
         fclose($output);
         return ob_get_clean();
 
+    }
+
+    /* CSV string to array
+    -------------------------- */
+
+    public function csv_to_array($file_content) {
+
+        /* Normalize line endings */
+        $file_content = str_replace(array("\r\n", "\r"), "\n", $file_content);
+
+        /* Detect separator from first line */
+        $first_line_end = strpos($file_content, "\n");
+        $first_line = $first_line_end === false ? $file_content : substr($file_content, 0, $first_line_end);
+        $separator = (strpos($first_line, ';') === false) ? ',' : ';';
+
+        /* Parse whole content while respecting quoted line breaks */
+        $handle = fopen('php://temp', 'r+');
+        if (!$handle) {
+            return false;
+        }
+        fwrite($handle, $file_content);
+        rewind($handle);
+
+        /* Extract column names */
+        $column_names = fgetcsv($handle, 0, $separator);
+        if (!is_array($column_names) || !isset($column_names[0])) {
+            fclose($handle);
+            return false;
+        }
+        $raw_line = array_fill_keys($column_names, '');
+        $column_names = array_map('trim', $column_names);
+        $column_names = array_map('strtolower', $column_names);
+
+        /* Build array */
+        $array = array();
+        while (($row = fgetcsv($handle, 0, $separator)) !== false) {
+            if ($row === array(null) || $row === array('')) {
+                continue;
+            }
+            $new_line = $raw_line;
+            foreach ($row as $key => $value) {
+                if (isset($column_names[$key])) {
+                    $new_line[$column_names[$key]] = $value;
+                }
+            }
+            $array[] = $new_line;
+        }
+        fclose($handle);
+
+        return $array;
     }
 
     /* ----------------------------------------------------------
