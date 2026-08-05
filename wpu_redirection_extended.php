@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.17.2
+Version: 0.17.3
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.17.2';
+    private $plugin_version = '0.17.3';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -1145,12 +1145,12 @@ class WPURedirectionExtended {
             return $existing_slugs;
         }
 
-        $posts = get_posts(array(
+        $posts = get_posts(apply_filters('wpu_redirection_extended__get_existing_slugs_query', array(
             'post_type' => 'any',
             'post_status' => 'any',
             'numberposts' => -1,
             'fields' => 'ids'
-        ));
+        )));
         $existing_slugs = array();
         foreach ($posts as $post_id) {
             $existing_slugs[] = wp_make_link_relative(get_permalink($post_id));
@@ -1178,6 +1178,25 @@ class WPURedirectionExtended {
         $existing_slugs_copy = $existing_slugs;
         foreach ($existing_slugs_copy as $slug) {
             $existing_slugs[] = $this->get_alternative_url($slug);
+        }
+
+        /* Add all PDF files */
+        $files = get_posts(array(
+            'post_type' => 'attachment',
+            'post_mime_type' => 'application/pdf',
+            'post_status' => 'inherit',
+            'numberposts' => 150,
+            'fields' => 'ids'
+        ));
+        foreach ($files as $file_id) {
+            $is_wpucf_att = get_post_meta($file_id, '_wpucontactforms_att', true);
+            if ($is_wpucf_att) {
+                continue;
+            }
+            $file_url = wp_get_attachment_url($file_id);
+            if ($file_url) {
+                $existing_slugs[] = wp_make_link_relative($file_url);
+            }
         }
 
         $existing_slugs = array_unique($existing_slugs);
@@ -1452,7 +1471,7 @@ class WPURedirectionExtended {
             $widget_infos = isset($this->widget_types[$widget_type]) ? $this->widget_types[$widget_type] : false;
             $html .= '<p>';
             if ($widget_infos && isset($widget_infos['search_param'])) {
-                $html .= '<a class="button" href="' . esc_url(admin_url('tools.php?page=redirection.php&sub=404s' . $widget_infos['search_param'])) . '">';
+                $html .= '<a class="button button-small" href="' . esc_url(admin_url('tools.php?page=redirection.php&sub=404s' . $widget_infos['search_param'])) . '">';
                 $html .= esc_html__('See all errors', 'wpu_redirection_extended');
                 $html .= '</a>';
             }
@@ -1464,7 +1483,7 @@ class WPURedirectionExtended {
 
     public function get_widget_download_button($widget_type) {
         $download_url = wp_nonce_url(admin_url('index.php?wpu_redir_ext_download_widget=' . $widget_type), 'wpu_redir_ext_download_' . $widget_type);
-        return '<a class="button" href="' . esc_url($download_url) . '">' . esc_html__('Export CSV', 'wpu_redirection_extended') . '</a>';
+        return '<a class="button button-small" href="' . esc_url($download_url) . '">' . esc_html__('Export CSV', 'wpu_redirection_extended') . '</a>';
     }
 
     /* ----------------------------------------------------------
