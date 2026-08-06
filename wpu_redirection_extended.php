@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.17.3
+Version: 0.18.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.17.3';
+    private $plugin_version = '0.18.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -1145,15 +1145,35 @@ class WPURedirectionExtended {
             return $existing_slugs;
         }
 
-        $posts = get_posts(apply_filters('wpu_redirection_extended__get_existing_slugs_query', array(
-            'post_type' => 'any',
-            'post_status' => 'any',
-            'numberposts' => -1,
-            'fields' => 'ids'
-        )));
         $existing_slugs = array();
-        foreach ($posts as $post_id) {
-            $existing_slugs[] = wp_make_link_relative(get_permalink($post_id));
+
+        $public_post_types = get_post_types(array(
+            'public' => true
+        ), 'names');
+        $excluded_post_types = apply_filters('wpu_redirection_extended__excluded_post_types', array(
+            'attachment'
+        ));
+        $post_types_without_archive = apply_filters('wpu_redirection_extended__post_types_without_archive', array(
+            'post',
+            'page'
+        ));
+        foreach ($public_post_types as $post_type) {
+            /* Archive */
+            $archive_link = get_post_type_archive_link($post_type);
+            if ($archive_link && !in_array($post_type, $post_types_without_archive)) {
+                $existing_slugs[] = wp_make_link_relative($archive_link);
+            }
+
+            /* Posts */
+            $posts = get_posts(apply_filters('wpu_redirection_extended__get_existing_slugs_query', array(
+                'post_type' => $post_type,
+                'post_status' => 'any',
+                'numberposts' => -1,
+                'fields' => 'ids'
+            ), $post_type));
+            foreach ($posts as $post_id) {
+                $existing_slugs[] = wp_make_link_relative(get_permalink($post_id));
+            }
         }
 
         $taxonomies = get_taxonomies(array(
