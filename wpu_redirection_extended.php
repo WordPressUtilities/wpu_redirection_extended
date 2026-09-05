@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.18.0
+Version: 0.18.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.18.0';
+    private $plugin_version = '0.18.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -1158,6 +1158,10 @@ class WPURedirectionExtended {
             'page'
         ));
         foreach ($public_post_types as $post_type) {
+            if (in_array($post_type, $excluded_post_types)) {
+                continue;
+            }
+
             /* Archive */
             $archive_link = get_post_type_archive_link($post_type);
             if ($archive_link && !in_array($post_type, $post_types_without_archive)) {
@@ -1167,11 +1171,15 @@ class WPURedirectionExtended {
             /* Posts */
             $posts = get_posts(apply_filters('wpu_redirection_extended__get_existing_slugs_query', array(
                 'post_type' => $post_type,
-                'post_status' => 'any',
+                'post_status' => array('publish', 'private', 'future', 'draft', 'pending'),
                 'numberposts' => -1,
                 'fields' => 'ids'
             ), $post_type));
             foreach ($posts as $post_id) {
+                $post_name = get_post_field('post_name', $post_id);
+                if (!$post_name) {
+                    continue;
+                }
                 $existing_slugs[] = wp_make_link_relative(get_permalink($post_id));
             }
         }

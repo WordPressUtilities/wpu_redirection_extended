@@ -4,7 +4,7 @@ namespace wpu_redirection_extended;
 /*
 Class Name: WPU Base Admin page
 Description: A class to handle pages in WordPress
-Version: 1.8.1
+Version: 1.8.2
 Class URI: https://github.com/WordPressUtilities/wpubaseplugin
 Author: Darklg
 Author URI: https://darklg.me/
@@ -37,15 +37,14 @@ class WPUBaseAdminPage {
             return;
         }
         $this->options = $options;
-        $this->pages = $pages;
-        $this->prefix = $this->options['id'] . '-';
-        $this->pages = $this->set_pages($this->pages);
-
         /* Set default options */
         if (!is_array($this->options)) {
             $this->options = array();
         }
         $this->options = array_merge($this->default_options, $this->options);
+        $this->pages = $pages;
+        $this->prefix = $this->options['id'] . '-';
+        $this->pages = $this->set_pages($this->pages);
 
         add_action($this->options['network_page'] ? 'network_admin_menu' : 'admin_menu', array(&$this,
             'set_admin_menu'
