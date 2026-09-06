@@ -534,6 +534,10 @@ msgstr "Le plugin Redirection n'est pas disponible."
 msgid "Redirection created: %1$s &rarr; %2$s"
 msgstr "Redirection créée : %1$s &rarr; %2$s"
 
+#: wpu_redirection_extended.php
+msgid "Incoming redirections"
+msgstr "Redirections entrantes"
+
 #~ msgid "Export Top 404"
 #~ msgstr "Exporter le Top 404"
 

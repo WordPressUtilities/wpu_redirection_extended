@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.18.1
+Version: 0.19.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.18.1';
+    private $plugin_version = '0.19.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -46,6 +46,7 @@ class WPURedirectionExtended {
         add_action('admin_menu', array(&$this, 'set_admin_menus'), 10);
         add_action('edit_form_after_title', array(&$this, 'notice_slug_match_redirection'));
         add_action('admin_init', array(&$this, 'notice_slug_match_redirection__all_terms'));
+        add_action('add_meta_boxes', array(&$this, 'add_metabox_incoming_redirections'));
         add_action('admin_init', array(&$this, 'handle_widget_csv_download'));
 
         /* Hooks for WP-CLI */
@@ -1435,6 +1436,69 @@ class WPURedirectionExtended {
 
         }
 
+    }
+
+    /* ----------------------------------------------------------
+      Metabox listing redirections pointing to the current URL
+    ---------------------------------------------------------- */
+
+    public function add_metabox_incoming_redirections() {
+        if (!current_user_can($this->user_level) || !$this->is_redirection_configured()) {
+            return;
+        }
+
+        $url = $this->get_current_slug();
+        if (!$url) {
+            return;
+        }
+
+        $redirections = $this->get_incoming_redirections($url);
+        if (!$redirections) {
+            return;
+        }
+
+        add_meta_box(
+            'wpu_redirection_extended_incoming',
+            __('Incoming redirections', 'wpu_redirection_extended'),
+            function () use ($redirections) {
+                $this->metabox_incoming_redirections_content($redirections);
+            }
+        );
+    }
+
+    public function metabox_incoming_redirections_content($redirections) {
+        echo '<ul>';
+        foreach ($redirections as $source) {
+            $link = admin_url('tools.php?page=redirection.php&filterby[url]=' . urlencode(rtrim($source, '/')));
+            echo '<li><a href="' . esc_url($link) . '">' . esc_html($source) . '</a></li>';
+        }
+        echo '</ul>';
+    }
+
+    /* Sources of the enabled redirections targeting this URL */
+    public function get_incoming_redirections($url) {
+        global $wpdb;
+
+        /* Site root, without the subdirectory part already carried by $url */
+        $host = preg_replace('#^(https?://[^/]+).*$#', '$1', home_url('/'));
+
+        /* Relative & absolute URL, with and without a trailing slash */
+        $targets = array(
+            $url,
+            $this->get_alternative_url($url),
+            $host . $url,
+            $host . $this->get_alternative_url($url)
+        );
+        $targets = array_unique($targets);
+
+        $placeholders = implode(',', array_fill(0, count($targets), '%s'));
+
+        return $wpdb->get_col($wpdb->prepare("SELECT url
+            FROM {$wpdb->prefix}redirection_items
+            WHERE status = 'enabled'
+              AND action_type = 'url'
+              AND action_data IN ($placeholders)
+            ORDER BY url ASC", $targets));
     }
 
     public function slug_match_regex_redirection($slug) {
