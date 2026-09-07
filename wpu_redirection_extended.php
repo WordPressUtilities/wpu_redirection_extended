@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.19.0
+Version: 0.20.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.19.0';
+    private $plugin_version = '0.20.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -944,8 +944,11 @@ class WPURedirectionExtended {
 
         $issues_found = 0;
         $duplicates_found = 0;
+        $unresolvable_found = 0;
+        $chained_found = 0;
         $duplicate_ids = $this->page_action__main__clean_redirections__duplicates($redirections, $diagnostic_only, $duplicates_found);
-        $existing_slugs = $this->get_existing_slugs();
+        $slugs_lookup = array_flip($this->get_existing_slugs());
+        $redirs_lookup = $diagnostic_only ? array_flip($this->get_existing_redirections()) : array();
         foreach ($redirections as $redirection) {
 
             /* Skip redirections already flagged as duplicates */
@@ -966,8 +969,13 @@ class WPURedirectionExtended {
             }
 
             /* Match an existing slug */
-            if ($this->page_action__main__clean_redirections__match_existing($redirection, $existing_slugs, $diagnostic_only)) {
+            if ($this->page_action__main__clean_redirections__match_existing($redirection, $slugs_lookup, $diagnostic_only)) {
                 $issues_found++;
+            }
+
+            /* Target cannot be resolved : warning only, no automatic fix is possible */
+            if ($diagnostic_only) {
+                $this->page_action__main__clean_redirections__unresolvable_target($redirection, $slugs_lookup, $redirs_lookup, $unresolvable_found, $chained_found);
             }
 
         }
@@ -980,18 +988,44 @@ class WPURedirectionExtended {
             }
         }
 
+        if ($unresolvable_found > 0) {
+            $this->set_message('redirection_unresolvable', sprintf(__('%s redirections target an internal URL that does not match any existing content.', 'wpu_redirection_extended'), '<strong>' . $unresolvable_found . '</strong>'), 'error');
+        }
+
+        if ($chained_found > 0) {
+            $this->set_message('redirection_chained', sprintf(__('%s redirections target an URL that is itself a redirection.', 'wpu_redirection_extended'), '<strong>' . $chained_found . '</strong>'), 'error');
+        }
+
         if ($diagnostic_only) {
-            if (!empty($this->redirection_issues)) {
-                $this->set_message('redirection_issues_list', implode('<br />', $this->redirection_issues), 'error');
-            }
             if ($issues_found == 0) {
                 $this->set_message('redirection_issues', __('No redirection issue found.', 'wpu_redirection_extended'), 'success');
             } else {
                 $this->set_message('redirection_issues', sprintf(__('%s redirections have issues that may cause conflicts or unexpected behavior.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'error');
             }
+            if (!empty($this->redirection_issues)) {
+                $issues_html = '';
+                foreach ($this->redirection_issues as $redirection_id => $redirection_issue) {
+                    $edit_link = admin_url('tools.php?page=redirection.php') . '&' . urlencode('filterby[url]') . '=' . urlencode($redirection_issue['url']);
+                    $url_link = '<a href="' . esc_url($edit_link) . '">' . esc_html($redirection_issue['url']) . '</a>';
+                    $issues_html .= '<strong>' . sprintf(__('Redirection #%1$s (%2$s)', 'wpu_redirection_extended'), $redirection_id, $url_link) . '</strong>';
+                    $issues_html .= '<ul class="ul-disc"><li>' . implode('</li><li>', $redirection_issue['issues']) . '</li></ul>';
+                }
+                $this->set_message('redirection_issues_list', $issues_html, 'error');
+            }
         } else {
             $this->set_message('redirections_cleaned', sprintf(__('Cleaned %s redirections with potential issues.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'success');
         }
+    }
+
+    /* Store an issue, grouped by redirection */
+    public function add_redirection_issue($redirection, $message) {
+        if (!isset($this->redirection_issues[$redirection->id])) {
+            $this->redirection_issues[$redirection->id] = array(
+                'url' => $redirection->url,
+                'issues' => array()
+            );
+        }
+        $this->redirection_issues[$redirection->id]['issues'][] = $message;
     }
 
     /* Detect duplicate redirections (same url + match_url) and disable extras */
@@ -1034,7 +1068,7 @@ class WPURedirectionExtended {
                 $duplicate_ids[$item->id] = true;
                 $duplicates_found++;
                 if ($diagnostic_only) {
-                    $this->redirection_issues[] = sprintf(__('Redirection with ID %1$s (%2$s) is a duplicate of ID %3$s.', 'wpu_redirection_extended'), $item->id, esc_html($item->url), $keeper->id);
+                    $this->add_redirection_issue($item, sprintf(__('Is a duplicate of ID %s.', 'wpu_redirection_extended'), $keeper->id));
                 } else {
                     $wpdb->update(
                         $wpdb->prefix . 'redirection_items',
@@ -1064,7 +1098,7 @@ class WPURedirectionExtended {
         }
 
         if ($diagnostic_only) {
-            $this->redirection_issues[] = sprintf(__('Redirection with ID %s (%s) does not allow query parameters and may cause issues.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url));
+            $this->add_redirection_issue($redirection, __('Query parameters are not allowed, which may cause issues.', 'wpu_redirection_extended'));
         } else {
             if (!isset($match_data['source']) || !is_array($match_data['source'])) {
                 $match_data['source'] = array();
@@ -1082,18 +1116,18 @@ class WPURedirectionExtended {
     }
 
     /* Check if a redirection matches an existing slug and disable it if not in diagnostic mode */
-    public function page_action__main__clean_redirections__match_existing($redirection, $existing_slugs, $diagnostic_only = false) {
+    public function page_action__main__clean_redirections__match_existing($redirection, $slugs_lookup, $diagnostic_only = false) {
         global $wpdb;
         $redirection_match_existing = false;
         if ($redirection->match_url == 'regex') {
-            foreach ($existing_slugs as $slug) {
+            foreach ($slugs_lookup as $slug => $slug_index) {
                 if (@preg_match('#' . $redirection->url . '#', $slug)) {
                     $redirection_match_existing = true;
                     break;
                 }
             }
         } else {
-            if (in_array($redirection->url, $existing_slugs) || in_array($this->get_alternative_url($redirection->url), $existing_slugs)) {
+            if (isset($slugs_lookup[$redirection->url]) || isset($slugs_lookup[$this->get_alternative_url($redirection->url)])) {
                 $redirection_match_existing = true;
             }
         }
@@ -1102,7 +1136,7 @@ class WPURedirectionExtended {
         }
 
         if ($diagnostic_only) {
-            $this->redirection_issues[] = sprintf(__('Redirection with ID %s (%s) matches an existing slug and may cause conflicts.', 'wpu_redirection_extended'), $redirection->id, esc_html($redirection->url));
+            $this->add_redirection_issue($redirection, __('Matches an existing slug and may cause conflicts.', 'wpu_redirection_extended'));
         } else {
             $wpdb->update(
                 $wpdb->prefix . 'redirection_items',
@@ -1113,6 +1147,92 @@ class WPURedirectionExtended {
             );
         }
         return true;
+    }
+
+    /* Check if a redirection targets an internal URL matching no existing content */
+    public function page_action__main__clean_redirections__unresolvable_target($redirection, $slugs_lookup, $redirs_lookup, &$unresolvable_found, &$chained_found) {
+
+        if ($redirection->action_type != 'url') {
+            return;
+        }
+
+        $target = is_string($redirection->action_data) ? trim($redirection->action_data) : '';
+        if (!$target) {
+            return;
+        }
+
+        /* Dynamic target using a regex backreference : cannot be checked */
+        if (preg_match('/\$[0-9]/', $target)) {
+            return;
+        }
+
+        $target = $this->normalize_internal_target($target);
+        if ($target === false) {
+            return;
+        }
+
+        $alt_target = $this->get_alternative_url($target);
+
+        /* Target matches an existing content */
+        if (isset($slugs_lookup[$target]) || isset($slugs_lookup[$alt_target])) {
+            return;
+        }
+
+        /* Target is itself a redirection source */
+        if (isset($redirs_lookup[$target]) || isset($redirs_lookup[$alt_target]) || $this->slug_match_regex_redirection($target)) {
+            $chained_found++;
+            $this->add_redirection_issue($redirection, sprintf(__('Targets %s which is itself a redirection.', 'wpu_redirection_extended'), esc_html($target)));
+            return;
+        }
+
+        $unresolvable_found++;
+        $this->add_redirection_issue($redirection, sprintf(__('Targets %s which does not match any existing content.', 'wpu_redirection_extended'), esc_html($target)));
+    }
+
+    /* Convert a redirection target to a comparable relative path, or false if it should be ignored */
+    public function normalize_internal_target($target) {
+
+        /* Absolute or protocol relative URL : keep only targets on this site */
+        if (preg_match('#^(https?:)?//#i', $target)) {
+            $target_host = parse_url($target, PHP_URL_HOST);
+            $home_host = parse_url(home_url('/'), PHP_URL_HOST);
+            if (!$target_host || !$home_host || strtolower($target_host) !== strtolower($home_host)) {
+                return false;
+            }
+            $target = wp_make_link_relative($target);
+        }
+
+        /* Anything else (mailto, anchor, relative path, …) is out of scope */
+        if (substr($target, 0, 1) !== '/') {
+            return false;
+        }
+
+        /* Drop query string & fragment */
+        $target = preg_replace('/[?#].*$/', '', $target);
+        if ($target === '') {
+            $target = '/';
+        }
+
+        /* Home page is never part of the existing slugs */
+        if ($target === '/') {
+            return false;
+        }
+
+        $ignored_prefixes = apply_filters('wpu_redirection_extended__internal_target_ignored_prefixes', array(
+            'wp-admin',
+            'wp-login.php',
+            'wp-json',
+            'wp-content',
+            'feed'
+        ));
+        $target_start = ltrim($target, '/');
+        foreach ($ignored_prefixes as $prefix) {
+            if (strpos($target_start, $prefix) === 0) {
+                return false;
+            }
+        }
+
+        return $target;
     }
 
     public function get_existing_redirection_regex() {
