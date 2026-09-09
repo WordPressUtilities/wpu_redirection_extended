@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.20.0
+Version: 0.21.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.20.0';
+    private $plugin_version = '0.21.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -320,16 +320,51 @@ class WPURedirectionExtended {
     ---------------------------------------------------------- */
 
     public function page_content__main() {
-        include __DIR__ . '/inc/tpl/admin-page-section-sitemap.php';
-        include __DIR__ . '/inc/tpl/admin-page-section-csv.php';
+        $tabs = array(
+            'csv' => array(
+                'label' => __('CSV', 'wpu_redirection_extended'),
+                'templates' => array('admin-page-section-csv.php')
+            ),
+            'sitemap' => array(
+                'label' => __('Sitemap', 'wpu_redirection_extended'),
+                'templates' => array('admin-page-section-sitemap.php')
+            )
+        );
 
-        if (!$this->is_redirection_configured()) {
-            return;
+        if ($this->is_redirection_configured()) {
+            $tabs['cleanup'] = array(
+                'label' => __('Cleanup', 'wpu_redirection_extended'),
+                'templates' => array('admin-page-section-clean-database.php', 'admin-page-section-clean-redirections.php')
+            );
+            $tabs['404'] = array(
+                'label' => __('404 errors', 'wpu_redirection_extended'),
+                'templates' => array('admin-page-section-widgets.php')
+            );
+            $tabs['misc'] = array(
+                'label' => __('Misc', 'wpu_redirection_extended'),
+                'templates' => array('admin-page-section-recommended-settings.php')
+            );
         }
 
-        include __DIR__ . '/inc/tpl/admin-page-section-clean-database.php';
-        include __DIR__ . '/inc/tpl/admin-page-section-clean-redirections.php';
-        include __DIR__ . '/inc/tpl/admin-page-section-widgets.php';
+        $first = true;
+        echo '<h2 class="nav-tab-wrapper" id="wre-tabs-nav">';
+        foreach ($tabs as $tab_id => $tab) {
+            echo '<a class="nav-tab' . ($first ? ' nav-tab-active' : '') . '" href="#wre-tab-' . esc_attr($tab_id) . '"' . ($first ? ' aria-current="true"' : '') . '>' . esc_html($tab['label']) . '</a>';
+            $first = false;
+        }
+        echo '</h2>';
+
+        $first = true;
+        foreach ($tabs as $tab_id => $tab) {
+            echo '<div class="wre-tab" id="wre-tab-' . esc_attr($tab_id) . '"' . ($first ? '' : ' hidden') . '>';
+            foreach ($tab['templates'] as $template) {
+                include __DIR__ . '/inc/tpl/' . $template;
+            }
+            echo '</div>';
+            $first = false;
+        }
+
+        include __DIR__ . '/inc/tpl/admin-page-tabs-script.php';
     }
 
     public function page_action__main() {
@@ -344,6 +379,10 @@ class WPURedirectionExtended {
 
         if (isset($_POST['submit_clean_database'])) {
             $this->page_action__main__submit_clean_database();
+        }
+
+        if (isset($_POST['submit_recommended_settings'])) {
+            $this->page_action__main__submit_recommended_settings();
         }
 
         if (isset($_POST['submit_fix_redirection_issues']) || isset($_POST['submit_get_redirection_issues'])) {
@@ -729,10 +768,79 @@ class WPURedirectionExtended {
             " . $urls_like_str);
 
         if (!$deleted) {
-            $this->set_message('database_cleaned', __('No invalid 404 log entries found.', 'wpu_redirection_extended'), 'success');
+            $this->set_message('database_cleaned', __('No invalid 404 log entries found.', 'wpu_redirection_extended'), 'updated');
             return;
         }
-        $this->set_message('database_cleaned', sprintf(__('Deleted %s log entries.', 'wpu_redirection_extended'), '<strong>' . $deleted . '</strong>'), 'success');
+        $this->set_message('database_cleaned', sprintf(__('Deleted %s log entries.', 'wpu_redirection_extended'), '<strong>' . $deleted . '</strong>'), 'updated');
+    }
+
+    public function get_recommended_settings() {
+        return apply_filters('wpu_redirection_extended_recommended_settings', array(
+            'expire_redirect' => array(
+                'value' => 7,
+                'label' => __('Redirect logs expiry', 'wpu_redirection_extended'),
+                'value_label' => __('7 days', 'wpu_redirection_extended')
+            ),
+            'expire_404' => array(
+                'value' => 30,
+                'label' => __('404 logs expiry', 'wpu_redirection_extended'),
+                'value_label' => __('30 days', 'wpu_redirection_extended')
+            ),
+            'rest_api' => array(
+                'value' => 1,
+                'label' => __('REST API', 'wpu_redirection_extended'),
+                'value_label' => __('Raw', 'wpu_redirection_extended')
+            ),
+            'flag_query' => array(
+                'value' => 'pass',
+                'label' => __('Query parameter matching', 'wpu_redirection_extended'),
+                'value_label' => __('ignore and pass all parameters', 'wpu_redirection_extended')
+            )
+        ));
+    }
+
+    public function page_action__main__submit_recommended_settings() {
+        if (!class_exists('Red_Options')) {
+            $this->set_message('recommended_settings_error', __('The Redirection plugin is not available.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        $recommended = $this->get_recommended_settings();
+
+        $settings = array();
+        foreach ($recommended as $key => $setting) {
+            if (!is_array($setting) || !array_key_exists('value', $setting)) {
+                continue;
+            }
+            $settings[$key] = $setting['value'];
+        }
+
+        if (!$settings) {
+            $this->set_message('recommended_settings_empty', __('No recommended setting to apply.', 'wpu_redirection_extended'), 'error');
+            return;
+        }
+
+        $before = Red_Options::get();
+        $after = Red_Options::save($settings);
+
+        /* Compare against the saved result: Red_Options clamps and validates values */
+        $changed = array();
+        foreach ($settings as $key => $value) {
+            if (!array_key_exists($key, $before) || !array_key_exists($key, $after)) {
+                continue;
+            }
+            if ($before[$key] === $after[$key]) {
+                continue;
+            }
+            $changed[] = isset($recommended[$key]['label']) ? $recommended[$key]['label'] : $key;
+        }
+
+        if (!$changed) {
+            $this->set_message('recommended_settings_ok', __('Redirection settings are already up to date.', 'wpu_redirection_extended'), 'updated');
+            return;
+        }
+
+        $this->set_message('recommended_settings_done', sprintf(__('Updated settings: %s.', 'wpu_redirection_extended'), implode(', ', $changed)), 'updated');
     }
 
     public function page_action__main__submit_csv($get_errors = false) {
@@ -914,7 +1022,7 @@ class WPURedirectionExtended {
 
         if ($get_errors) {
             if (empty($errors_list)) {
-                $this->set_message('csv_upload_no_errors', __('No errors found in the uploaded file.', 'wpu_redirection_extended'), 'success');
+                $this->set_message('csv_upload_no_errors', __('No errors found in the uploaded file.', 'wpu_redirection_extended'), 'updated');
             } else {
                 $sep = '<br />- ';
                 $this->set_message('csv_upload_errors', __('Errors found in the uploaded file :', 'wpu_redirection_extended') . $sep . implode($sep, $errors_list), 'error');
@@ -984,7 +1092,7 @@ class WPURedirectionExtended {
             if ($diagnostic_only) {
                 $this->set_message('redirection_duplicates', sprintf(__('%s duplicate redirections detected (same source).', 'wpu_redirection_extended'), '<strong>' . $duplicates_found . '</strong>'), 'error');
             } else {
-                $this->set_message('redirection_duplicates', sprintf(__('Disabled %s duplicate redirections (same source).', 'wpu_redirection_extended'), '<strong>' . $duplicates_found . '</strong>'), 'success');
+                $this->set_message('redirection_duplicates', sprintf(__('Disabled %s duplicate redirections (same source).', 'wpu_redirection_extended'), '<strong>' . $duplicates_found . '</strong>'), 'updated');
             }
         }
 
@@ -998,7 +1106,7 @@ class WPURedirectionExtended {
 
         if ($diagnostic_only) {
             if ($issues_found == 0) {
-                $this->set_message('redirection_issues', __('No redirection issue found.', 'wpu_redirection_extended'), 'success');
+                $this->set_message('redirection_issues', __('No redirection issue found.', 'wpu_redirection_extended'), 'updated');
             } else {
                 $this->set_message('redirection_issues', sprintf(__('%s redirections have issues that may cause conflicts or unexpected behavior.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'error');
             }
@@ -1013,7 +1121,7 @@ class WPURedirectionExtended {
                 $this->set_message('redirection_issues_list', $issues_html, 'error');
             }
         } else {
-            $this->set_message('redirections_cleaned', sprintf(__('Cleaned %s redirections with potential issues.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'success');
+            $this->set_message('redirections_cleaned', sprintf(__('Cleaned %s redirections with potential issues.', 'wpu_redirection_extended'), '<strong>' . $issues_found . '</strong>'), 'updated');
         }
     }
 
@@ -1868,7 +1976,7 @@ class WPURedirectionExtended {
         if (is_wp_error($result)) {
             $this->set_message('404_redirect_error', $result->get_error_message(), 'error');
         } else {
-            $this->set_message('404_redirect_success', sprintf(__('Redirection created: %1$s &rarr; %2$s', 'wpu_redirection_extended'), esc_html($source), esc_html($target)), 'success');
+            $this->set_message('404_redirect_success', sprintf(__('Redirection created: %1$s &rarr; %2$s', 'wpu_redirection_extended'), esc_html($source), esc_html($target)), 'updated');
         }
 
         wp_safe_redirect($redirect_back);

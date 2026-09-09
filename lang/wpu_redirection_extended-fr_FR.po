@@ -562,6 +562,18 @@ msgid "Redirection created: %1$s &rarr; %2$s"
 msgstr "Redirection créée : %1$s &rarr; %2$s"
 
 #, php-format
+msgid "Sitemap"
+msgstr "Plan du site"
+
+msgid "CSV"
+msgstr "CSV"
+
+msgid "Cleanup"
+msgstr "Nettoyage"
+
+msgid "404 errors"
+msgstr "Erreurs 404"
+
 #~ msgid ""
 #~ "Redirection with ID %s (%s) does not allow query parameters and may cause "
 #~ "issues."
@@ -588,3 +600,76 @@ msgstr "Redirection créée : %1$s &rarr; %2$s"
 
 #~ msgid "Upload"
 #~ msgstr "Téléverser"
+
+#: wpu_redirection_extended.php
+msgid "Misc"
+msgstr "Divers"
+
+#: inc/tpl/admin-page-section-recommended-settings.php
+msgid "Recommended settings"
+msgstr "Réglages recommandés"
+
+#: inc/tpl/admin-page-section-recommended-settings.php
+msgid "Apply the recommended Redirection settings:"
+msgstr "Appliquer les réglages recommandés pour Redirection :"
+
+#. translators: 1: setting name, 2: recommended value
+#: inc/tpl/admin-page-section-recommended-settings.php
+msgid "%1$s: %2$s"
+msgstr "%1$s : %2$s"
+
+#: inc/tpl/admin-page-section-recommended-settings.php
+msgid "Existing values will be overwritten."
+msgstr "Les valeurs existantes seront écrasées."
+
+#: inc/tpl/admin-page-section-recommended-settings.php
+msgid "Apply recommended settings"
+msgstr "Appliquer les réglages recommandés"
+
+#: wpu_redirection_extended.php
+msgid "Redirect logs expiry"
+msgstr "Expiration des journaux de redirection"
+
+#: wpu_redirection_extended.php
+msgid "7 days"
+msgstr "7 jours"
+
+#: wpu_redirection_extended.php
+msgid "404 logs expiry"
+msgstr "Expiration des journaux 404"
+
+#: wpu_redirection_extended.php
+msgid "30 days"
+msgstr "30 jours"
+
+#: wpu_redirection_extended.php
+msgid "REST API"
+msgstr "API REST"
+
+#: wpu_redirection_extended.php
+msgid "Raw"
+msgstr "Brute"
+
+#: wpu_redirection_extended.php
+msgid "Query parameter matching"
+msgstr "Correspondance des paramètres de requête"
+
+#: wpu_redirection_extended.php
+msgid "ignore and pass all parameters"
+msgstr "ignorer et transmettre tous les paramètres"
+
+#: wpu_redirection_extended.php
+msgid "Redirection settings are already up to date."
+msgstr "Les réglages de Redirection sont déjà à jour."
+
+#: wpu_redirection_extended.php
+msgid "Updated settings: %s."
+msgstr "Réglages mis à jour : %s."
+
+#: wpu_redirection_extended.php
+msgid "No recommended setting to apply."
+msgstr "Aucun réglage recommandé à appliquer."
+
+#: inc/tpl/admin-page-section-recommended-settings.php
+msgid "(see current settings)"
+msgstr "(voir les réglages actuels)"

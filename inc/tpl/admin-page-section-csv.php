@@ -3,7 +3,6 @@ defined('ABSPATH') || die;
 
 /* "Validate your CSV file" section. Runs in WPURedirectionExtended::page_content__main() scope ($this available). */
 
-echo '<hr />';
 echo '<h2>' . esc_html__('Validate your CSV file', 'wpu_redirection_extended') . '</h2>';
 echo '<table class="form-table">';
 echo $this->get_admin_field_html('upload_file', array(
