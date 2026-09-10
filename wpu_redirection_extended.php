@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.21.0
+Version: 0.21.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.21.0';
+    private $plugin_version = '0.21.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -1367,6 +1367,46 @@ class WPURedirectionExtended {
         return $existing_redirections;
     }
 
+    /* Return a relative URL in every language : language prefix, plus the
+       translated base slug when Polylang Pro translates slugs.
+       $lang_prefixes is keyed by language slug. */
+    public function get_lang_variants($relative_url, $lang_prefixes, $slug_type = '') {
+        if (count($lang_prefixes) < 2) {
+            return array($relative_url);
+        }
+
+        /* Drop an already present language prefix before re-adding each one */
+        foreach ($lang_prefixes as $prefix) {
+            if ($prefix !== '' && strpos($relative_url, $prefix . '/') === 0) {
+                $relative_url = substr($relative_url, strlen($prefix));
+                break;
+            }
+        }
+
+        $urls = array();
+        foreach ($lang_prefixes as $lang => $prefix) {
+            $urls[] = $prefix . $this->translate_base_slug($relative_url, $lang, $slug_type);
+        }
+        return $urls;
+    }
+
+    /* Rewrite the base slug of a relative URL into $lang, when Polylang Pro
+       translates slugs. Idempotent : accepts an already translated URL.
+       $slug_type is a PLL_Translate_Slugs_Model type : post type name,
+       taxonomy name, or 'archive_<post_type>'. */
+    public function translate_base_slug($relative_url, $lang, $slug_type) {
+        if (!$slug_type || !$lang || !function_exists('PLL') || !isset(PLL()->translate_slugs->slugs_model)) {
+            return $relative_url;
+        }
+
+        $lang_obj = PLL()->model->get_language($lang);
+        if (!$lang_obj) {
+            return $relative_url;
+        }
+
+        return PLL()->translate_slugs->slugs_model->switch_translated_slug($relative_url, $lang_obj, $slug_type);
+    }
+
     public function get_existing_slugs() {
         $cache_id = 'wpu_redirection_extended_existing_slugs';
         $existing_slugs = wp_cache_get($cache_id);
@@ -1375,6 +1415,18 @@ class WPURedirectionExtended {
         }
 
         $existing_slugs = array();
+
+        /* Polylang : relative home prefix per language slug, [''] when inactive */
+        $lang_prefixes = array('');
+        if (function_exists('pll_languages_list') && function_exists('pll_home_url')) {
+            $pll_prefixes = array();
+            foreach (pll_languages_list() as $lang) {
+                $pll_prefixes[$lang] = untrailingslashit(wp_make_link_relative(pll_home_url($lang)));
+            }
+            if (!empty($pll_prefixes)) {
+                $lang_prefixes = $pll_prefixes;
+            }
+        }
 
         $public_post_types = get_post_types(array(
             'public' => true
@@ -1394,7 +1446,8 @@ class WPURedirectionExtended {
             /* Archive */
             $archive_link = get_post_type_archive_link($post_type);
             if ($archive_link && !in_array($post_type, $post_types_without_archive)) {
-                $existing_slugs[] = wp_make_link_relative($archive_link);
+                /* Archive links are not translated outside of the front-end : build one URL per language */
+                $existing_slugs = array_merge($existing_slugs, $this->get_lang_variants(wp_make_link_relative($archive_link), $lang_prefixes, 'archive_' . $post_type));
             }
 
             /* Posts */
@@ -1402,14 +1455,19 @@ class WPURedirectionExtended {
                 'post_type' => $post_type,
                 'post_status' => array('publish', 'private', 'future', 'draft', 'pending'),
                 'numberposts' => -1,
-                'fields' => 'ids'
+                'fields' => 'ids',
+                'lang' => ''
             ), $post_type));
             foreach ($posts as $post_id) {
                 $post_name = get_post_field('post_name', $post_id);
                 if (!$post_name) {
                     continue;
                 }
-                $existing_slugs[] = wp_make_link_relative(get_permalink($post_id));
+                $post_url = wp_make_link_relative(get_permalink($post_id));
+                if (function_exists('pll_get_post_language')) {
+                    $post_url = $this->translate_base_slug($post_url, pll_get_post_language($post_id), $post_type);
+                }
+                $existing_slugs[] = $post_url;
             }
         }
 
@@ -1421,13 +1479,19 @@ class WPURedirectionExtended {
             $terms = get_terms(array(
                 'taxonomy' => $taxonomy,
                 'hide_empty' => true,
-                'fields' => 'ids'
+                'fields' => 'ids',
+                'lang' => ''
             ));
             foreach ($terms as $term_id) {
                 $term_link = get_term_link($term_id);
-                if (!is_wp_error($term_link)) {
-                    $existing_slugs[] = wp_make_link_relative($term_link);
+                if (is_wp_error($term_link)) {
+                    continue;
                 }
+                $term_url = wp_make_link_relative($term_link);
+                if (function_exists('pll_get_term_language')) {
+                    $term_url = $this->translate_base_slug($term_url, pll_get_term_language($term_id), $taxonomy);
+                }
+                $existing_slugs[] = $term_url;
             }
         }
 
