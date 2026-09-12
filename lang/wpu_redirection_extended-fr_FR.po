@@ -574,6 +574,9 @@ msgstr "Nettoyage"
 msgid "404 errors"
 msgstr "Erreurs 404"
 
+msgid "404 errors over the last 30 days"
+msgstr "Erreurs 404 sur les 30 derniers jours"
+
 #~ msgid ""
 #~ "Redirection with ID %s (%s) does not allow query parameters and may cause "
 #~ "issues."

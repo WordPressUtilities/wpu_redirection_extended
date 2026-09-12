@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.21.1
+Version: 0.22.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.21.1';
+    private $plugin_version = '0.22.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -48,6 +48,7 @@ class WPURedirectionExtended {
         add_action('admin_init', array(&$this, 'notice_slug_match_redirection__all_terms'));
         add_action('add_meta_boxes', array(&$this, 'add_metabox_incoming_redirections'));
         add_action('admin_init', array(&$this, 'handle_widget_csv_download'));
+        add_action('admin_enqueue_scripts', array(&$this, 'enqueue_admin_scripts'));
 
         /* Hooks for WP-CLI */
         add_action('wpu_redirection_extended_clean_database', array(&$this,
@@ -338,7 +339,7 @@ class WPURedirectionExtended {
             );
             $tabs['404'] = array(
                 'label' => __('404 errors', 'wpu_redirection_extended'),
-                'templates' => array('admin-page-section-widgets.php')
+                'templates' => array('admin-page-section-404-graph.php', 'admin-page-section-widgets.php')
             );
             $tabs['misc'] = array(
                 'label' => __('Misc', 'wpu_redirection_extended'),
@@ -1801,6 +1802,41 @@ class WPURedirectionExtended {
             }
         }
         return false;
+    }
+
+    /* ----------------------------------------------------------
+      Graph
+    ---------------------------------------------------------- */
+
+    /* Load Chart.js on the plugin admin page only */
+    public function enqueue_admin_scripts($hook) {
+        if ($hook !== 'tools_page_' . $this->plugin_settings['id'] . '-main') {
+            return;
+        }
+        wp_enqueue_script('wpu-redirection-extended-chartjs', plugins_url('assets/chart.umd.min.js', __FILE__), array(), '4.4.4', true);
+    }
+
+    /* Number of 404 errors for each of the last N days, missing days filled with 0 */
+    public function get_404_daily_counts($nb_days = 30) {
+        global $wpdb;
+
+        $counts = array();
+        for ($i = $nb_days - 1; $i >= 0; $i--) {
+            $counts[date('Y-m-d', strtotime('-' . $i . ' days', current_time('timestamp')))] = 0;
+        }
+
+        $results = $wpdb->get_results($wpdb->prepare("SELECT DATE(created) AS day, COUNT(*) AS result_count
+            FROM {$wpdb->prefix}redirection_404
+            WHERE created >= %s
+            GROUP BY DATE(created)", array_key_first($counts) . ' 00:00:00'), ARRAY_A);
+
+        foreach ($results as $result) {
+            if (isset($counts[$result['day']])) {
+                $counts[$result['day']] = (int) $result['result_count'];
+            }
+        }
+
+        return $counts;
     }
 
     /* ----------------------------------------------------------
