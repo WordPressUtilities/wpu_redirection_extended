@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.22.0
+Version: 0.22.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.22.0';
+    private $plugin_version = '0.22.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -1813,7 +1813,7 @@ class WPURedirectionExtended {
         if ($hook !== 'tools_page_' . $this->plugin_settings['id'] . '-main') {
             return;
         }
-        wp_enqueue_script('wpu-redirection-extended-chartjs', plugins_url('assets/chart.umd.min.js', __FILE__), array(), '4.4.4', true);
+        wp_enqueue_script('wpu-redirection-extended-chartjs', plugins_url('assets/chart.umd.min.js', __FILE__), array(), '4.5.1', true);
     }
 
     /* Number of 404 errors for each of the last N days, missing days filled with 0 */

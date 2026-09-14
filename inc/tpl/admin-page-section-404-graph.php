@@ -7,9 +7,19 @@ if (!current_user_can($this->user_level) || !$this->is_redirection_configured())
     return;
 }
 
-$graph_counts = $this->get_404_daily_counts();
+$nb_days = 30;
 
-echo '<h2>' . esc_html__('404 errors over the last 30 days', 'wpu_redirection_extended') . '</h2>';
+$red_options = array();
+if (class_exists('Red_Options')) {
+    $red_options = Red_Options::get();
+}
+if (is_array($red_options) && isset($red_options['expire_404']) && is_numeric($red_options['expire_404'])) {
+    $nb_days = (int) $red_options['expire_404'];
+}
+
+$graph_counts = $this->get_404_daily_counts($nb_days);
+
+echo '<h2>' . esc_html(sprintf(__('404 errors over the last %d days', 'wpu_redirection_extended'), $nb_days)) . '</h2>';
 
 if (!array_sum($graph_counts)) {
     echo '<p>' . esc_html__('No data found.', 'wpu_redirection_extended') . '</p>';
@@ -22,7 +32,7 @@ foreach (array_keys($graph_counts) as $graph_day) {
     $graph_labels[] = date_i18n('j M', strtotime($graph_day));
 }
 
-echo '<div style="max-width:100%"><canvas id="wre-404-graph" height="200"></canvas></div>';
+echo '<div style="height:200px;max-width:100%"><canvas id="wre-404-graph" height="200"></canvas></div>';
 ?>
 <script>
 (function() {
