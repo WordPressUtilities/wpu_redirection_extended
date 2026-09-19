@@ -684,3 +684,99 @@ msgstr "Redirection créée : %1$s &rarr; %2$s"
 
 #~ msgid "Upload"
 #~ msgstr "Téléverser"
+
+msgid "404 spike"
+msgstr "Pic de 404"
+
+msgid "Sent when the number of 404 errors of the previous day exceeds twice the average of the days before."
+msgstr "Envoyé lorsque le nombre d'erreurs 404 de la veille dépasse le double de la moyenne des jours précédents."
+
+msgid "WPU Redirection Extended : the 404 spike alert is disabled because the Redirection 404 logs are not kept long enough. Set the 404 log retention to at least 5 days in the Redirection options."
+msgstr "WPU Redirection Extended : l'alerte de pic de 404 est désactivée car les logs 404 de Redirection ne sont pas conservés assez longtemps. Réglez la conservation des logs 404 sur au moins 5 jours dans les options de Redirection."
+
+msgid "[%s] 404 spike : %s yesterday vs %s on average (%s days)"
+msgstr "[%s] Pic de 404 : %s hier contre %s en moyenne (%s jours)"
+
+msgid "Yesterday (%s) : %s 404 errors, including %s from bots."
+msgstr "Hier (%s) : %s erreurs 404, dont %s de bots."
+
+msgid "Average of the %s previous days (%s to %s) : %s."
+msgstr "Moyenne des %s jours précédents (du %s au %s) : %s."
+
+msgid "Threshold : average x %s = %s."
+msgstr "Seuil : moyenne x %s = %s."
+
+msgid "Top URLs :"
+msgstr "Top des URLs :"
+
+msgid "Notifications"
+msgstr "Notifications"
+
+msgid "Notifications email"
+msgstr "E-mail de notification"
+
+msgid "Leave empty to use the website administration email."
+msgstr "Laisser vide pour utiliser l'e-mail d'administration du site."
+
+msgid "Webhook URL"
+msgstr "URL du webhook"
+
+msgid "HTTPS incoming webhook : Slack, Mattermost or Discord (with the /slack suffix)."
+msgstr "Webhook entrant HTTPS : Slack, Mattermost ou Discord (avec le suffixe /slack)."
+
+msgid "%s : notify by email"
+msgstr "%s : notifier par e-mail"
+
+msgid "%s : notify by webhook"
+msgstr "%s : notifier par webhook"
+
+msgid "Notification email to %s could not be sent."
+msgstr "L'e-mail de notification vers %s n'a pas pu être envoyé."
+
+msgid "Notification webhook failed : %s"
+msgstr "Échec du webhook de notification : %s"
+
+msgid "Notification webhook returned a %s error : %s"
+msgstr "Le webhook de notification a renvoyé une erreur %s : %s"
+
+msgid "The notifications webhook URL must start with https://"
+msgstr "L'URL du webhook de notification doit commencer par https://"
+
+msgid "Webhook notifications are enabled but no webhook URL is configured."
+msgstr "Les notifications par webhook sont activées mais aucune URL de webhook n'est configurée."
+
+msgid "Check all"
+msgstr "Tout cocher"
+
+msgid "Uncheck all"
+msgstr "Tout décocher"
+
+msgid "Save Changes"
+msgstr "Enregistrer les modifications"
+
+msgid "Save"
+msgstr "Enregistrer"
+
+msgid "Settings saved."
+msgstr "Réglages enregistrés."
+
+msgid "Import Settings"
+msgstr "Importer les réglages"
+
+msgid "Language"
+msgstr "Langue"
+
+msgid "Sources"
+msgstr "Sources"
+
+msgid "One #hashtag or one @user per line."
+msgstr "Un #hashtag ou un @utilisateur par ligne."
+
+msgid "This value is set by the constant %s and cannot be edited here."
+msgstr "Cette valeur est définie par la constante %s et ne peut pas être modifiée ici."
+
+msgid "Upload New Media"
+msgstr "Téléverser un nouveau média"
+
+msgid "You do not have sufficient permissions to access this page."
+msgstr "Vous n'avez pas les droits suffisants pour accéder à cette page."

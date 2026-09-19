@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.22.1
+Version: 0.23.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.22.1';
+    private $plugin_version = '0.23.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -31,6 +31,9 @@ class WPURedirectionExtended {
     private $basetoolbox;
     private $messages;
     private $adminpages;
+    private $settings;
+    private $settings_details;
+    private $basenotify;
     private $widget_types = array();
     private $redirection_issues = array();
 
@@ -39,16 +42,23 @@ class WPURedirectionExtended {
         add_action('init', array(&$this, 'load_toolbox'));
         add_action('init', array(&$this, 'load_admin_page'));
         add_action('init', array(&$this, 'load_messages'));
+        add_action('init', array(&$this, 'load_settings'));
         add_action('init', array(&$this, 'check_dependencies'));
         add_action('init', array(&$this, 'set_custom_roles'), 11);
         add_action('init', array(&$this, 'load_widget_types'));
         add_action('wp_dashboard_setup', array(&$this, 'add_dashboard_widgets'));
+        add_action('admin_notices', array(&$this, 'notice_404_spike_retention'));
         add_action('admin_menu', array(&$this, 'set_admin_menus'), 10);
         add_action('edit_form_after_title', array(&$this, 'notice_slug_match_redirection'));
         add_action('admin_init', array(&$this, 'notice_slug_match_redirection__all_terms'));
         add_action('add_meta_boxes', array(&$this, 'add_metabox_incoming_redirections'));
         add_action('admin_init', array(&$this, 'handle_widget_csv_download'));
         add_action('admin_enqueue_scripts', array(&$this, 'enqueue_admin_scripts'));
+
+        /* 404 spike alert */
+        add_action('init', array(&$this, 'schedule_404_spike_check'));
+        add_action('wpu_redirection_extended_check_404_spike', array(&$this, 'check_404_spike'));
+        register_deactivation_hook(__FILE__, array(&$this, 'unschedule_404_spike_check'));
 
         /* Hooks for WP-CLI */
         add_action('wpu_redirection_extended_clean_database', array(&$this,
@@ -208,6 +218,44 @@ class WPURedirectionExtended {
         $this->messages->set_message($id, $message, $group);
     }
 
+    # SETTINGS
+    public function load_settings() {
+        $this->settings_details = array(
+            /* Rendered inside the "settings" tab of the main admin page, not in a page of its own */
+            'create_page' => false,
+            /* Must match the admin page slug so is_admin_page detection works */
+            'plugin_id' => $this->plugin_settings['id'] . '-main',
+            'option_id' => $this->plugin_settings['id'] . '_options',
+            'plugin_name' => $this->plugin_settings['name'],
+            'user_cap' => $this->user_level,
+            'sections' => array()
+        );
+
+        require_once __DIR__ . '/inc/WPUBaseNotify/WPUBaseNotify.php';
+        $this->basenotify = new \wpu_redirection_extended\WPUBaseNotify(array(
+            'option_id' => $this->settings_details['option_id'],
+            'plugin_name' => $this->plugin_settings['name'],
+            'user_cap' => $this->user_level,
+            'notifications' => array(
+                '404_spike' => array(
+                    'label' => __('404 spike', 'wpu_redirection_extended'),
+                    'help' => __('Sent when the number of 404 errors of the previous day exceeds twice the average of the days before.', 'wpu_redirection_extended')
+                )
+            )
+        ));
+
+        $this->settings_details['sections'] += $this->basenotify->get_settings_section();
+        $settings = $this->basenotify->get_settings_fields();
+
+        /* Settings screen is the only consumer of WPUBaseSettings : notifications are sent front-side */
+        if (!is_admin()) {
+            return;
+        }
+
+        require_once __DIR__ . '/inc/WPUBaseSettings/WPUBaseSettings.php';
+        $this->settings = new \wpu_redirection_extended\WPUBaseSettings($this->settings_details, $settings);
+    }
+
     # DEPENDENCIES
     public function check_dependencies() {
         $this->basetoolbox->check_plugins_dependencies(array(
@@ -256,7 +304,7 @@ class WPURedirectionExtended {
                 'search_param' => '&filterby%5Bagent%5D=bot&groupby=url',
                 'query' => "SELECT COUNT(*) AS result_count, url
                     FROM {$wpdb->prefix}redirection_404
-                    WHERE agent LIKE '%bot%' OR ip LIKE '66.249%'
+                    WHERE {$this->get_bots_sql_predicate()}
                     GROUP BY url"
             ),
             'files' => array(
@@ -280,6 +328,178 @@ class WPURedirectionExtended {
                     GROUP BY SUBSTRING_INDEX(url, '?', 1)"
             )
         ));
+    }
+
+
+    /* ----------------------------------------------------------
+      404 spike alert
+    ---------------------------------------------------------- */
+
+    # 404 SPIKE
+
+    /* Shared by the "bots" dashboard widget and the spike breakdown : keep a single definition */
+    public function get_bots_sql_predicate() {
+        return "agent LIKE '%bot%' OR ip LIKE '66.249%'";
+    }
+
+    public function schedule_404_spike_check() {
+        if (wp_next_scheduled('wpu_redirection_extended_check_404_spike')) {
+            return;
+        }
+        /* Tomorrow 8am, site time : the alert talks about "yesterday", so the hour has to be stable */
+        $local_start = strtotime('tomorrow 08:00', current_time('timestamp'));
+        $utc_start = $local_start - intval(get_option('gmt_offset') * HOUR_IN_SECONDS);
+        wp_schedule_event($utc_start, 'daily', 'wpu_redirection_extended_check_404_spike');
+    }
+
+    public function unschedule_404_spike_check() {
+        wp_clear_scheduled_hook('wpu_redirection_extended_check_404_spike');
+    }
+
+    /* How many baseline days the Redirection log retention actually allows.
+       0 means the alert cannot run. */
+    public function get_404_spike_baseline_days() {
+        $options = get_option('redirection_options');
+        $expire = isset($options['expire_404']) ? intval($options['expire_404']) : 7;
+        /* -1 : 404 logging is disabled */
+        if ($expire < 0) {
+            return 0;
+        }
+        /* 0 : logs are kept forever */
+        $days = $expire === 0 ? 8 : min(8, $expire - 2);
+        return $days >= 3 ? $days : 0;
+    }
+
+    /* The retention conflict is a pure function of the Redirection option : recompute it
+       instead of storing a flag the cron would have to keep in sync. */
+    public function notice_404_spike_retention() {
+        if (!current_user_can($this->user_level)) {
+            return;
+        }
+        if (!$this->basenotify || !$this->basenotify->is_enabled('404_spike')) {
+            return;
+        }
+        if ($this->get_404_spike_baseline_days()) {
+            return;
+        }
+        echo '<div class="notice notice-warning"><p>';
+        echo esc_html(__('WPU Redirection Extended : the 404 spike alert is disabled because the Redirection 404 logs are not kept long enough. Set the 404 log retention to at least 5 days in the Redirection options.', 'wpu_redirection_extended'));
+        echo '</p></div>';
+    }
+
+    public function check_404_spike() {
+        global $wpdb;
+
+        /* Cheap guard before any query */
+        if (!$this->basenotify || !$this->basenotify->is_enabled('404_spike')) {
+            return;
+        }
+
+        $now = current_time('timestamp');
+        $today = date('Y-m-d', $now);
+        $option_last = $this->plugin_settings['id'] . '_404_spike_last_notified';
+        /* WP-Cron can fire twice the same morning : one alert per day, whatever happens */
+        if (get_option($option_last) === $today) {
+            return;
+        }
+
+        $baseline_days = $this->get_404_spike_baseline_days();
+        if (!$baseline_days) {
+            return;
+        }
+
+        $yesterday = date('Y-m-d', strtotime('-1 day', $now));
+        $baseline_start = date('Y-m-d', strtotime('-' . ($baseline_days + 1) . ' days', $now));
+        $baseline_end = date('Y-m-d', strtotime('-2 days', $now));
+
+        /* Literal % of the bot predicate have to be doubled to survive wpdb::prepare() */
+        $bots_predicate = str_replace('%', '%%', $this->get_bots_sql_predicate());
+        $stats = $wpdb->get_row($wpdb->prepare("SELECT
+                SUM(CASE WHEN DATE(created) = %s THEN 1 ELSE 0 END) AS day_count,
+                SUM(CASE WHEN DATE(created) = %s AND ({$bots_predicate}) THEN 1 ELSE 0 END) AS day_bots,
+                SUM(CASE WHEN DATE(created) < %s THEN 1 ELSE 0 END) AS baseline_count
+            FROM {$wpdb->prefix}redirection_404
+            WHERE created >= %s AND created < %s",
+            $yesterday,
+            $yesterday,
+            $yesterday,
+            $baseline_start . ' 00:00:00',
+            $today . ' 00:00:00'
+        ));
+
+        if (!$stats) {
+            return;
+        }
+
+        $day_count = intval($stats->day_count);
+        $day_bots = intval($stats->day_bots);
+        /* Divided by the full number of days : days without a single 404 have no row but still count */
+        $average = intval($stats->baseline_count) / $baseline_days;
+
+        $thresholds = apply_filters('wpu_redirection_extended_404_spike_thresholds', array(
+            'ratio' => 2,
+            'min_count' => 20
+        ));
+        $ratio = isset($thresholds['ratio']) ? floatval($thresholds['ratio']) : 2;
+        $min_count = isset($thresholds['min_count']) ? intval($thresholds['min_count']) : 20;
+
+        if ($day_count < $min_count) {
+            return;
+        }
+        if ($day_count <= $average * $ratio) {
+            return;
+        }
+
+        $this->basenotify->notify('404_spike',
+            sprintf(__('[%s] 404 spike : %s yesterday vs %s on average (%s days)', 'wpu_redirection_extended'),
+                wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES),
+                number_format_i18n($day_count),
+                number_format_i18n($average, 1),
+                $baseline_days
+            ),
+            $this->get_404_spike_message($yesterday, $day_count, $day_bots, $average, $ratio, $baseline_days, $baseline_start, $baseline_end)
+        );
+
+        update_option($option_last, $today, false);
+    }
+
+    /* Only built once the alert is triggered : the extra query costs nothing on a normal day */
+    private function get_404_spike_message($yesterday, $day_count, $day_bots, $average, $ratio, $baseline_days, $baseline_start, $baseline_end) {
+        global $wpdb;
+
+        $message = sprintf(__('Yesterday (%s) : %s 404 errors, including %s from bots.', 'wpu_redirection_extended'),
+            $yesterday,
+            number_format_i18n($day_count),
+            number_format_i18n($day_bots)
+        ) . "\n";
+        $message .= sprintf(__('Average of the %s previous days (%s to %s) : %s.', 'wpu_redirection_extended'),
+            $baseline_days,
+            $baseline_start,
+            $baseline_end,
+            number_format_i18n($average, 1)
+        ) . "\n";
+        $message .= sprintf(__('Threshold : average x %s = %s.', 'wpu_redirection_extended'),
+            number_format_i18n($ratio, 1),
+            number_format_i18n($average * $ratio, 1)
+        ) . "\n";
+
+        $top_urls = $wpdb->get_results($wpdb->prepare("SELECT COUNT(*) AS result_count, url
+            FROM {$wpdb->prefix}redirection_404
+            WHERE DATE(created) = %s
+            GROUP BY url
+            ORDER BY result_count DESC
+            LIMIT 5", $yesterday));
+
+        if ($top_urls) {
+            $message .= "\n" . __('Top URLs :', 'wpu_redirection_extended') . "\n";
+            foreach ($top_urls as $top_url) {
+                $message .= '  ' . $top_url->result_count . '  ' . $top_url->url . "\n";
+            }
+        }
+
+        $message .= "\n" . admin_url('tools.php?page=redirection.php&sub=404s');
+
+        return $message;
     }
 
     /* ----------------------------------------------------------
@@ -329,6 +549,10 @@ class WPURedirectionExtended {
             'sitemap' => array(
                 'label' => __('Sitemap', 'wpu_redirection_extended'),
                 'templates' => array('admin-page-section-sitemap.php')
+            ),
+            'settings' => array(
+                'label' => __('Settings', 'wpu_redirection_extended'),
+                'templates' => array('admin-page-section-settings.php')
             )
         );
 
@@ -380,6 +604,13 @@ class WPURedirectionExtended {
 
         if (isset($_POST['submit_clean_database'])) {
             $this->page_action__main__submit_clean_database();
+        }
+
+        if (isset($_POST['submit_settings']) && $this->settings) {
+            $option_id = $this->settings_details['option_id'];
+            $values = isset($_POST[$option_id]) && is_array($_POST[$option_id]) ? wp_unslash($_POST[$option_id]) : array();
+            $this->settings->update_opt($this->settings->options_validate($values));
+            $this->set_message('settings_saved', __('Settings have been saved.', 'wpu_redirection_extended'), 'updated');
         }
 
         if (isset($_POST['submit_recommended_settings'])) {

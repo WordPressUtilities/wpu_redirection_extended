@@ -12,3 +12,10 @@ WP_CLI::add_command('wpu-redirection-extended-clean-database', function () {
     'synopsis' => array()
 ));
 
+
+WP_CLI::add_command('wpu-redirection-extended-check-404-spike', function () {
+    do_action('wpu_redirection_extended_check_404_spike');
+}, array(
+    'shortdesc' => 'Check if yesterday 404 errors exceed the previous days average and send the alert.',
+    'synopsis' => array()
+));
