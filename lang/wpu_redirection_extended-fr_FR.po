@@ -724,11 +724,11 @@ msgstr "URL du webhook"
 msgid "HTTPS incoming webhook : Slack, Mattermost or Discord (with the /slack suffix)."
 msgstr "Webhook entrant HTTPS : Slack, Mattermost ou Discord (avec le suffixe /slack)."
 
-msgid "%s : notify by email"
-msgstr "%s : notifier par e-mail"
+msgid "E-mail"
+msgstr "E-mail"
 
-msgid "%s : notify by webhook"
-msgstr "%s : notifier par webhook"
+msgid "Webhook"
+msgstr "Webhook"
 
 msgid "Notification email to %s could not be sent."
 msgstr "L'e-mail de notification vers %s n'a pas pu être envoyé."

@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.23.1
+Version: 0.23.2
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.23.1';
+    private $plugin_version = '0.23.2';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -330,7 +330,6 @@ class WPURedirectionExtended {
         ));
     }
 
-
     /* ----------------------------------------------------------
       404 spike alert
     ---------------------------------------------------------- */
@@ -549,10 +548,6 @@ class WPURedirectionExtended {
             'sitemap' => array(
                 'label' => __('Sitemap', 'wpu_redirection_extended'),
                 'templates' => array('admin-page-section-sitemap.php')
-            ),
-            'settings' => array(
-                'label' => __('Settings', 'wpu_redirection_extended'),
-                'templates' => array('admin-page-section-settings.php')
             )
         );
 
@@ -570,6 +565,11 @@ class WPURedirectionExtended {
                 'templates' => array('admin-page-section-recommended-settings.php')
             );
         }
+
+        $tabs['settings'] = array(
+            'label' => __('Settings', 'wpu_redirection_extended'),
+            'templates' => array('admin-page-section-settings.php')
+        );
 
         $first = true;
         echo '<h2 class="nav-tab-wrapper" id="wre-tabs-nav">';
