@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.23.2
+Version: 0.24.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.23.2';
+    private $plugin_version = '0.24.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -359,7 +359,7 @@ class WPURedirectionExtended {
        0 means the alert cannot run. */
     public function get_404_spike_baseline_days() {
         $options = get_option('redirection_options');
-        $expire = isset($options['expire_404']) ? intval($options['expire_404']) : 7;
+        $expire = intval($options['expire_404'] ?? 7);
         /* -1 : 404 logging is disabled */
         if ($expire < 0) {
             return 0;
@@ -439,8 +439,8 @@ class WPURedirectionExtended {
             'ratio' => 2,
             'min_count' => 20
         ));
-        $ratio = isset($thresholds['ratio']) ? floatval($thresholds['ratio']) : 2;
-        $min_count = isset($thresholds['min_count']) ? intval($thresholds['min_count']) : 20;
+        $ratio = floatval($thresholds['ratio'] ?? 2);
+        $min_count = intval($thresholds['min_count'] ?? 20);
 
         if ($day_count < $min_count) {
             return;
@@ -466,39 +466,54 @@ class WPURedirectionExtended {
     private function get_404_spike_message($yesterday, $day_count, $day_bots, $average, $ratio, $baseline_days, $baseline_start, $baseline_end) {
         global $wpdb;
 
-        $message = sprintf(__('Yesterday (%s) : %s 404 errors, including %s from bots.', 'wpu_redirection_extended'),
-            $yesterday,
-            number_format_i18n($day_count),
-            number_format_i18n($day_bots)
-        ) . "\n";
-        $message .= sprintf(__('Average of the %s previous days (%s to %s) : %s.', 'wpu_redirection_extended'),
-            $baseline_days,
-            $baseline_start,
-            $baseline_end,
-            number_format_i18n($average, 1)
-        ) . "\n";
-        $message .= sprintf(__('Threshold : average x %s = %s.', 'wpu_redirection_extended'),
-            number_format_i18n($ratio, 1),
-            number_format_i18n($average * $ratio, 1)
-        ) . "\n";
+        $lines = array(
+            sprintf(__('Yesterday (%s) : %s 404 errors, including %s from bots.', 'wpu_redirection_extended'),
+                $yesterday,
+                number_format_i18n($day_count),
+                number_format_i18n($day_bots)
+            ),
+            sprintf(__('Average of the %s previous days (%s to %s) : %s.', 'wpu_redirection_extended'),
+                $baseline_days,
+                $baseline_start,
+                $baseline_end,
+                number_format_i18n($average, 1)
+            ),
+            sprintf(__('Threshold : average x %s = %s.', 'wpu_redirection_extended'),
+                number_format_i18n($ratio, 1),
+                number_format_i18n($average * $ratio, 1)
+            )
+        );
 
-        $top_urls = $wpdb->get_results($wpdb->prepare("SELECT COUNT(*) AS result_count, url
-            FROM {$wpdb->prefix}redirection_404
-            WHERE DATE(created) = %s
-            GROUP BY url
-            ORDER BY result_count DESC
-            LIMIT 5", $yesterday));
+        /* Column names are hardcoded : safe to interpolate */
+        $tops = array(
+            'url' => __('Top URLs :', 'wpu_redirection_extended'),
+            'ip' => __('Top IPs :', 'wpu_redirection_extended')
+        );
+        $day_start = $yesterday . ' 00:00:00';
+        $day_end = date('Y-m-d H:i:s', strtotime($day_start . ' +1 day'));
 
-        if ($top_urls) {
-            $message .= "\n" . __('Top URLs :', 'wpu_redirection_extended') . "\n";
-            foreach ($top_urls as $top_url) {
-                $message .= '  ' . $top_url->result_count . '  ' . $top_url->url . "\n";
+        foreach ($tops as $column => $title) {
+            $limit = apply_filters('wpu_redirection_extended_404_spike_top_' . $column . 's_count', 10);
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT COUNT(*) AS result_count, {$column} AS value
+                FROM {$wpdb->prefix}redirection_404
+                WHERE created >= %s AND created < %s
+                GROUP BY {$column}
+                ORDER BY result_count DESC
+                LIMIT %d", $day_start, $day_end, $limit));
+            if (!$rows) {
+                continue;
+            }
+            $lines[] = '';
+            $lines[] = $title;
+            foreach ($rows as $row) {
+                $lines[] = '  ' . $row->result_count . '  ' . $row->value;
             }
         }
 
-        $message .= "\n" . admin_url('tools.php?page=redirection.php&sub=404s');
+        $lines[] = '';
+        $lines[] = admin_url('tools.php?page=redirection.php&sub=404s');
 
-        return $message;
+        return implode("\n", $lines);
     }
 
     /* ----------------------------------------------------------
@@ -736,11 +751,7 @@ class WPURedirectionExtended {
         ));
     }
 
-    public function fetch_sitemap_urls($url, &$urls, $max_urls, $max_children, $timeout, &$limit_reached, $depth = 0, $timeout_override = null) {
-
-        if ($timeout_override !== null) {
-            $timeout = (int) $timeout_override;
-        }
+    public function fetch_sitemap_urls($url, &$urls, $max_urls, $max_children, $timeout, &$limit_reached, $depth = 0) {
 
         if (count($urls) >= $max_urls) {
             $limit_reached = true;
@@ -1083,6 +1094,10 @@ class WPURedirectionExtended {
         }
 
         $file_info = finfo_open(FILEINFO_MIME_TYPE);
+        if (!$file_info) {
+            $this->set_message('csv_upload_error', __('Unable to check the uploaded file type.', 'wpu_redirection_extended'), 'error');
+            return false;
+        }
         $mime_type = finfo_file($file_info, $_FILES['upload_file']['tmp_name']);
         finfo_close($file_info);
 
@@ -2098,7 +2113,7 @@ class WPURedirectionExtended {
         $limit_sql = $limit > 0 ? ' LIMIT ' . intval($limit) : '';
         $order_sql = ' ORDER BY result_count DESC ';
 
-        $widget_infos = isset($this->widget_types[$widget_type]) ? $this->widget_types[$widget_type] : false;
+        $widget_infos = $this->widget_types[$widget_type] ?? false;
         if (!$widget_infos || !isset($widget_infos['query'])) {
             return array();
         }
@@ -2119,7 +2134,7 @@ class WPURedirectionExtended {
         ));
 
         if ($widget_type) {
-            $widget_infos = isset($this->widget_types[$widget_type]) ? $this->widget_types[$widget_type] : false;
+            $widget_infos = $this->widget_types[$widget_type] ?? false;
             $html .= '<p>';
             if ($widget_infos && isset($widget_infos['search_param'])) {
                 $html .= '<a class="button button-small" href="' . esc_url(admin_url('tools.php?page=redirection.php&sub=404s' . $widget_infos['search_param'])) . '">';
@@ -2146,14 +2161,15 @@ class WPURedirectionExtended {
         if (!isset($_GET['wpu_redir_ext_download_widget'])) {
             return;
         }
-        $widget_type = sanitize_text_field($_GET['wpu_redir_ext_download_widget']);
+        if (!current_user_can($this->user_level)) {
+            return;
+        }
+        $widget_type = sanitize_text_field(wp_unslash($_GET['wpu_redir_ext_download_widget']));
         if (!isset($this->widget_types[$widget_type])) {
             return;
         }
-        if (!wp_verify_nonce($_GET['_wpnonce'], 'wpu_redir_ext_download_' . $widget_type)) {
-            return;
-        }
-        if (!current_user_can($this->user_level)) {
+        $nonce = isset($_GET['_wpnonce']) ? sanitize_text_field(wp_unslash($_GET['_wpnonce'])) : '';
+        if (!wp_verify_nonce($nonce, 'wpu_redir_ext_download_' . $widget_type)) {
             return;
         }
         if (!$this->is_redirection_configured()) {
@@ -2247,7 +2263,7 @@ class WPURedirectionExtended {
         }
 
         // Source = current path without query string
-        $source = wp_parse_url(esc_url_raw($_SERVER['REQUEST_URI']), PHP_URL_PATH);
+        $source = wp_parse_url(esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'] ?? '')), PHP_URL_PATH);
         if (!is_string($source) || $source === '') {
             return;
         }

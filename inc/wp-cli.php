@@ -7,6 +7,7 @@ if(!defined('WP_CLI') || !WP_CLI) {
 
 WP_CLI::add_command('wpu-redirection-extended-clean-database', function () {
     do_action('wpu_redirection_extended_clean_database');
+    WP_CLI::success('Database cleanup done.');
 }, array(
     'shortdesc' => 'Clean the database by removing old redirections and logs.',
     'synopsis' => array()
@@ -15,6 +16,7 @@ WP_CLI::add_command('wpu-redirection-extended-clean-database', function () {
 
 WP_CLI::add_command('wpu-redirection-extended-check-404-spike', function () {
     do_action('wpu_redirection_extended_check_404_spike');
+    WP_CLI::success('404 spike check done.');
 }, array(
     'shortdesc' => 'Check if yesterday 404 errors exceed the previous days average and send the alert.',
     'synopsis' => array()

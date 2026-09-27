@@ -2,7 +2,7 @@
 defined('ABSPATH') || die;
 
 /* Minimal redirect-creation modal shown in the footer of 404 pages.
-   Runs in WPURedirectionExtended::display_404_redirect_form() scope ($source and $this available). */
+   Runs in WPURedirectionExtended::display_404_redirect_form() scope ($source, $suggestions and $this available). */
 
 echo '<div id="wpu-redir-ext-404-modal" style="position:fixed;left:20px;bottom:20px;z-index:99999;width:400px;max-width:calc(100vw - 40px);box-sizing:border-box;padding:20px;background:#1d2327;color:#fff;font:14px/1.4 sans-serif;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4)">';
 echo '<button type="button" onclick="document.getElementById(\'wpu-redir-ext-404-modal\').remove()" aria-label="' . esc_attr__('Close', 'wpu_redirection_extended') . '" style="position:absolute;top:8px;right:8px;width:28px;height:28px;padding:0;border:0;background:transparent;color:#fff;font-size:20px;line-height:1;cursor:pointer">&times;</button>';
