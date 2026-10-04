@@ -4,12 +4,12 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.24.0
+Version: 0.25.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
 Domain Path: /lang
-Requires at least: 6.2
+Requires at least: 6.9
 Requires PHP: 8.0
 Requires Plugins: redirection
 Network: Optional
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.24.0';
+    private $plugin_version = '0.25.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -2062,23 +2062,32 @@ class WPURedirectionExtended {
         wp_enqueue_script('wpu-redirection-extended-chartjs', plugins_url('assets/chart.umd.min.js', __FILE__), array(), '4.5.1', true);
     }
 
-    /* Number of 404 errors for each of the last N days, missing days filled with 0 */
-    public function get_404_daily_counts($nb_days = 30) {
+    /* Number of 404 errors per day or per hour, missing periods filled with 0 */
+    public function get_404_counts($nb_periods = 30, $unit = 'day') {
         global $wpdb;
 
+        $hourly = ('hour' === $unit);
+        $php_format = $hourly ? 'Y-m-d H:00:00' : 'Y-m-d';
+        $sql_format = $hourly ? '%%Y-%%m-%%d %%H:00:00' : '%%Y-%%m-%%d';
+
         $counts = array();
-        for ($i = $nb_days - 1; $i >= 0; $i--) {
-            $counts[date('Y-m-d', strtotime('-' . $i . ' days', current_time('timestamp')))] = 0;
+        for ($i = $nb_periods - 1; $i >= 0; $i--) {
+            $counts[date($php_format, strtotime('-' . $i . ' ' . $unit, current_time('timestamp')))] = 0;
         }
 
-        $results = $wpdb->get_results($wpdb->prepare("SELECT DATE(created) AS day, COUNT(*) AS result_count
+        $start = array_key_first($counts);
+        if (!$hourly) {
+            $start .= ' 00:00:00';
+        }
+
+        $results = $wpdb->get_results($wpdb->prepare("SELECT DATE_FORMAT(created, '{$sql_format}') AS period, COUNT(*) AS result_count
             FROM {$wpdb->prefix}redirection_404
             WHERE created >= %s
-            GROUP BY DATE(created)", array_key_first($counts) . ' 00:00:00'), ARRAY_A);
+            GROUP BY period", $start), ARRAY_A);
 
         foreach ($results as $result) {
-            if (isset($counts[$result['day']])) {
-                $counts[$result['day']] = (int) $result['result_count'];
+            if (isset($counts[$result['period']])) {
+                $counts[$result['period']] = (int) $result['result_count'];
             }
         }
 
