@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.25.0
+Version: 0.26.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.25.0';
+    private $plugin_version = '0.26.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -59,6 +59,9 @@ class WPURedirectionExtended {
         add_action('init', array(&$this, 'schedule_404_spike_check'));
         add_action('wpu_redirection_extended_check_404_spike', array(&$this, 'check_404_spike'));
         register_deactivation_hook(__FILE__, array(&$this, 'unschedule_404_spike_check'));
+
+        /* 404 log filtering */
+        add_filter('redirection_404_data', array(&$this, 'filter_404_log_data'));
 
         /* Hooks for WP-CLI */
         add_action('wpu_redirection_extended_clean_database', array(&$this,
@@ -331,10 +334,37 @@ class WPURedirectionExtended {
     }
 
     /* ----------------------------------------------------------
-      404 spike alert
+      404 log filtering
     ---------------------------------------------------------- */
 
-    # 404 SPIKE
+    /* Returning false prevents Redirection from inserting the 404 log entry */
+    public function filter_404_log_data($insert) {
+        if (!$insert || empty($insert['url'])) {
+            return $insert;
+        }
+        $patterns = apply_filters('wpu_redirection_extended_404_ignore_patterns', array(
+            'wp-login',
+            '/admin/',
+            '.env',
+            '.git/',
+            '.yml',
+            '.yaml',
+            '.sql',
+            '.bak',
+            'phpmyadmin',
+            '/cgi-bin/'
+        ));
+        foreach ($patterns as $pattern) {
+            if ($pattern !== '' && stripos($insert['url'], $pattern) !== false) {
+                return false;
+            }
+        }
+        return $insert;
+    }
+
+    /* ----------------------------------------------------------
+      404 spike alert
+    ---------------------------------------------------------- */
 
     /* Shared by the "bots" dashboard widget and the spike breakdown : keep a single definition */
     public function get_bots_sql_predicate() {
