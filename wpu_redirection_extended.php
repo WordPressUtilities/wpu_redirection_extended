@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.26.0
+Version: 0.26.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.26.0';
+    private $plugin_version = '0.26.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -440,6 +440,12 @@ class WPURedirectionExtended {
         $yesterday = date('Y-m-d', strtotime('-1 day', $now));
         $baseline_start = date('Y-m-d', strtotime('-' . ($baseline_days + 1) . ' days', $now));
         $baseline_end = date('Y-m-d', strtotime('-2 days', $now));
+
+        /* Days without any log would count as 0 404 and fake a spike : wait for the baseline window to be fully covered */
+        $first_log = $wpdb->get_var("SELECT MIN(created) FROM {$wpdb->prefix}redirection_404");
+        if (!$first_log || $first_log >= $baseline_start . ' 00:00:00') {
+            return;
+        }
 
         /* Literal % of the bot predicate have to be doubled to survive wpdb::prepare() */
         $bots_predicate = str_replace('%', '%%', $this->get_bots_sql_predicate());
