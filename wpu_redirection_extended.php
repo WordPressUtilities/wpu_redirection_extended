@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.26.1
+Version: 0.27.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.26.1';
+    private $plugin_version = '0.27.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -247,8 +247,32 @@ class WPURedirectionExtended {
             )
         ));
 
+        $this->settings_details['sections']['404_filtering'] = array(
+            'name' => __('404 log filtering', 'wpu_redirection_extended')
+        );
         $this->settings_details['sections'] += $this->basenotify->get_settings_section();
-        $settings = $this->basenotify->get_settings_fields();
+        $settings = array(
+            /* Inverted toggle : an unsaved checkbox renders unchecked, so filtering stays enabled by default */
+            '404_ignore_disabled' => array(
+                'section' => '404_filtering',
+                'type' => 'checkbox',
+                'label' => __('Disable filtering', 'wpu_redirection_extended'),
+                'label_check' => __('Log every 404, without ignoring any URL or user agent', 'wpu_redirection_extended')
+            ),
+            '404_ignore_urls' => array(
+                'section' => '404_filtering',
+                'type' => 'textarea',
+                'label' => __('Ignored URLs', 'wpu_redirection_extended'),
+                /* translators: %s : comma-separated list of default patterns */
+                'help' => sprintf(__('One pattern per line, matched anywhere in the URL (case-insensitive). Always ignored : %s', 'wpu_redirection_extended'), implode(', ', $this->get_404_default_ignore_patterns()))
+            ),
+            '404_ignore_agents' => array(
+                'section' => '404_filtering',
+                'type' => 'textarea',
+                'label' => __('Ignored user agents', 'wpu_redirection_extended'),
+                'help' => __('One pattern per line, matched anywhere in the user agent (case-insensitive).', 'wpu_redirection_extended')
+            )
+        ) + $this->basenotify->get_settings_fields();
 
         /* Settings screen is the only consumer of WPUBaseSettings : notifications are sent front-side */
         if (!is_admin()) {
@@ -342,7 +366,30 @@ class WPURedirectionExtended {
         if (!$insert || empty($insert['url'])) {
             return $insert;
         }
-        $patterns = apply_filters('wpu_redirection_extended_404_ignore_patterns', array(
+        /* Read directly : WPUBaseSettings is only instantiated in admin */
+        $options = get_option($this->settings_details['option_id']);
+        if (!is_array($options)) {
+            $options = array();
+        }
+        if (!empty($options['404_ignore_disabled'])) {
+            return $insert;
+        }
+
+        $patterns = array_merge($this->get_404_default_ignore_patterns(), $this->get_404_option_lines($options, '404_ignore_urls'));
+        $patterns = apply_filters('wpu_redirection_extended_404_ignore_patterns', $patterns);
+        if ($this->string_matches_patterns($insert['url'], $patterns)) {
+            return false;
+        }
+
+        $agents = apply_filters('wpu_redirection_extended_404_ignore_agents', $this->get_404_option_lines($options, '404_ignore_agents'));
+        if (!empty($insert['agent']) && $this->string_matches_patterns($insert['agent'], $agents)) {
+            return false;
+        }
+        return $insert;
+    }
+
+    public function get_404_default_ignore_patterns() {
+        return array(
             'wp-login',
             '/admin/',
             '.env',
@@ -353,13 +400,24 @@ class WPURedirectionExtended {
             '.bak',
             'phpmyadmin',
             '/cgi-bin/'
-        ));
+        );
+    }
+
+    /* One pattern per line, blank lines skipped */
+    public function get_404_option_lines($options, $key) {
+        if (empty($options[$key]) || !is_string($options[$key])) {
+            return array();
+        }
+        return array_values(array_filter(array_map('trim', explode("\n", $options[$key]))));
+    }
+
+    public function string_matches_patterns($string, $patterns) {
         foreach ($patterns as $pattern) {
-            if ($pattern !== '' && stripos($insert['url'], $pattern) !== false) {
-                return false;
+            if ($pattern !== '' && stripos($string, $pattern) !== false) {
+                return true;
             }
         }
-        return $insert;
+        return false;
     }
 
     /* ----------------------------------------------------------

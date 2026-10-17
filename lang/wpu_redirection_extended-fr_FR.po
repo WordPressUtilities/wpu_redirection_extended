@@ -880,3 +880,33 @@ msgstr "Redirection créée : %1$s &rarr; %2$s"
 
 #~ msgid "Upload"
 #~ msgstr "Téléverser"
+
+#: .././wpu_redirection_extended.php
+msgid "404 log filtering"
+msgstr "Filtrage du log 404"
+
+#: .././wpu_redirection_extended.php
+msgid "Disable filtering"
+msgstr "Désactiver le filtrage"
+
+#: .././wpu_redirection_extended.php
+msgid "Log every 404, without ignoring any URL or user agent"
+msgstr "Enregistrer toutes les 404, sans ignorer aucune URL ni aucun user agent"
+
+#: .././wpu_redirection_extended.php
+msgid "Ignored URLs"
+msgstr "URLs ignorées"
+
+#. translators: %s : comma-separated list of default patterns
+#: .././wpu_redirection_extended.php
+#, php-format
+msgid "One pattern per line, matched anywhere in the URL (case-insensitive). Always ignored : %s"
+msgstr "Un motif par ligne, recherché n’importe où dans l’URL (insensible à la casse). Toujours ignorés : %s"
+
+#: .././wpu_redirection_extended.php
+msgid "Ignored user agents"
+msgstr "User agents ignorés"
+
+#: .././wpu_redirection_extended.php
+msgid "One pattern per line, matched anywhere in the user agent (case-insensitive)."
+msgstr "Un motif par ligne, recherché n’importe où dans le user agent (insensible à la casse)."
