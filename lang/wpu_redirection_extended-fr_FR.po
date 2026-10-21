@@ -679,6 +679,11 @@ msgstr ""
 msgid "Line %s: before value is a duplicate within the CSV."
 msgstr "Ligne %s : la valeur « before » est en double dans le fichier CSV."
 
+#: .././wpu_redirection_extended.php:1372
+#, php-format
+msgid "Line %s: before value is in the excluded prefixes list."
+msgstr "Ligne %s : la valeur avant fait partie des préfixes exclus."
+
 #: .././wpu_redirection_extended.php:1247
 #, php-format
 msgid "Line %s: before value already exists as a slug."

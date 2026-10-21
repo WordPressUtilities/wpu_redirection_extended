@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.27.0
+Version: 0.28.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.27.0';
+    private $plugin_version = '0.28.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -1230,6 +1230,18 @@ class WPURedirectionExtended {
             $existing_redirections = $this->get_existing_redirections();
         }
 
+        $excluded_prefixes = apply_filters('wpu_redirection_extended__submit_csv_excluded_prefixes', array(
+            '/?p=',
+            '/.well-known',
+            '/feed/',
+            '/wp-admin/',
+            '/wp-json/',
+            '/wp-includes/'
+        ));
+        if (!is_array($excluded_prefixes)) {
+            $excluded_prefixes = array();
+        }
+
         $excluded_urls = apply_filters('wpu_redirection_extended__submit_csv_excluded_urls', array(
             '/*',
             '/wp-content/plugins/*',
@@ -1352,6 +1364,14 @@ class WPURedirectionExtended {
             if (in_array($before, $excluded_urls)) {
                 $errors_list[] = sprintf(__('Line %s: before value is in the excluded URLs list.', 'wpu_redirection_extended'), $line_number);
                 continue;
+            }
+
+            /* Filter excluded prefixes */
+            foreach ($excluded_prefixes as $prefix) {
+                if (strpos($before, $prefix) === 0) {
+                    $errors_list[] = sprintf(__('Line %s: before value is in the excluded prefixes list.', 'wpu_redirection_extended'), $line_number);
+                    continue 2;
+                }
             }
 
             $csv_values[] = array(
@@ -2156,6 +2176,71 @@ class WPURedirectionExtended {
         wp_enqueue_script('wpu-redirection-extended-chartjs', plugins_url('assets/chart.umd.min.js', __FILE__), array(), '4.5.1', true);
     }
 
+    /* 404 time range selected on the admin page (wre_graph_range), shared by the graph, widgets and CSV export */
+    public function get_404_ranges() {
+        $nb_days = 30;
+        if (class_exists('Red_Options')) {
+            $red_options = Red_Options::get();
+            /* expire_404 : 0 = never expire, -1 = no logs */
+            if (is_array($red_options) && isset($red_options['expire_404']) && is_numeric($red_options['expire_404']) && $red_options['expire_404'] > 0) {
+                $nb_days = (int) $red_options['expire_404'];
+            }
+        }
+
+        $label_days = __('Last %d days', 'wpu_redirection_extended');
+        $title_days = __('404 errors over the last %d days', 'wpu_redirection_extended');
+        $title_hours = __('404 errors over the last %d hours', 'wpu_redirection_extended');
+        $ranges = array(
+            'days' => array(
+                'label' => sprintf($label_days, $nb_days),
+                'title' => sprintf($title_days, $nb_days),
+                'unit' => 'day',
+                'periods' => $nb_days,
+                'format' => 'j M'
+            )
+        );
+
+        /* Only useful when logs are kept longer than a week */
+        $extra_periods_days = array(14, 7);
+        foreach ($extra_periods_days as $period) {
+            if ($nb_days > $period + 2) {
+                $ranges[$period . 'd'] = array(
+                    'label' => sprintf($label_days, $period),
+                    'title' => sprintf($title_days, $period),
+                    'unit' => 'day',
+                    'periods' => $period,
+                    'format' => 'j M'
+                );
+            }
+        }
+        $extra_periods_hours = array(48, 24);
+        foreach ($extra_periods_hours as $period) {
+            $ranges[$period . 'h'] = array(
+                'label' => sprintf(__('Last %d hours', 'wpu_redirection_extended'), $period),
+                'title' => sprintf($title_hours, $period),
+                'unit' => 'hour',
+                'periods' => $period,
+                'format' => 'j M, H\h'
+            );
+        }
+        return $ranges;
+    }
+
+    public function get_404_range() {
+        $ranges = $this->get_404_ranges();
+        $range_id = isset($_GET['wre_graph_range']) ? sanitize_key($_GET['wre_graph_range']) : 'days';
+        if (!isset($ranges[$range_id])) {
+            $range_id = 'days';
+        }
+        $range = $ranges[$range_id];
+        $range['id'] = $range_id;
+
+        /* Same start as the first period of get_404_counts() */
+        $hourly = ('hour' === $range['unit']);
+        $range['since'] = date($hourly ? 'Y-m-d H:00:00' : 'Y-m-d 00:00:00', strtotime('-' . ($range['periods'] - 1) . ' ' . $range['unit'], current_time('timestamp')));
+        return $range;
+    }
+
     /* Number of 404 errors per day or per hour, missing periods filled with 0 */
     public function get_404_counts($nb_periods = 30, $unit = 'day') {
         global $wpdb;
@@ -2211,7 +2296,7 @@ class WPURedirectionExtended {
         }
     }
 
-    public function get_widget_query_results($widget_type, $limit = 0, $output = OBJECT) {
+    public function get_widget_query_results($widget_type, $limit = 0, $output = OBJECT, $since = '') {
         global $wpdb;
         $limit_sql = $limit > 0 ? ' LIMIT ' . intval($limit) : '';
         $order_sql = ' ORDER BY result_count DESC ';
@@ -2220,11 +2305,18 @@ class WPURedirectionExtended {
         if (!$widget_infos || !isset($widget_infos['query'])) {
             return array();
         }
-        return $wpdb->get_results($widget_infos['query'] . $order_sql . $limit_sql, $output);
+        $query = $widget_infos['query'];
+        if ($since) {
+            /* swap the table for a date-filtered derived table so every widget query (filtered ones included) is scoped without rewriting it. Breaks if a query aliases the table name itself. */
+            $table = $wpdb->prefix . 'redirection_404';
+            $query = str_replace($table, $wpdb->prepare("(SELECT * FROM {$table} WHERE created >= %s) AS {$table}", $since), $query);
+        }
+        return $wpdb->get_results($query . $order_sql . $limit_sql, $output);
     }
 
-    public function wpu_redirection_get_widget_content($widget_type = '') {
-        $lines = $this->get_widget_query_results($widget_type, 10, ARRAY_A);
+    public function wpu_redirection_get_widget_content($widget_type = '', $range = false) {
+        $since = $range ? $range['since'] : '';
+        $lines = $this->get_widget_query_results($widget_type, 10, ARRAY_A, $since);
         if (empty($lines)) {
             return '<p>' . esc_html__('No data found.', 'wpu_redirection_extended') . '</p>';
         }
@@ -2244,14 +2336,18 @@ class WPURedirectionExtended {
                 $html .= esc_html__('See all errors', 'wpu_redirection_extended');
                 $html .= '</a>';
             }
-            $html .= ' ' . $this->get_widget_download_button($widget_type);
+            $html .= ' ' . $this->get_widget_download_button($widget_type, $range ? $range['id'] : '');
             $html .= '</p>';
         }
         return $html;
     }
 
-    public function get_widget_download_button($widget_type) {
-        $download_url = wp_nonce_url(admin_url('index.php?wpu_redir_ext_download_widget=' . $widget_type), 'wpu_redir_ext_download_' . $widget_type);
+    public function get_widget_download_button($widget_type, $range_id = '') {
+        $download_url = admin_url('index.php?wpu_redir_ext_download_widget=' . $widget_type);
+        if ($range_id) {
+            $download_url = add_query_arg('wre_graph_range', $range_id, $download_url);
+        }
+        $download_url = wp_nonce_url($download_url, 'wpu_redir_ext_download_' . $widget_type);
         return '<a class="button button-small" href="' . esc_url($download_url) . '">' . esc_html__('Export CSV', 'wpu_redirection_extended') . '</a>';
     }
 
@@ -2278,11 +2374,13 @@ class WPURedirectionExtended {
         if (!$this->is_redirection_configured()) {
             return;
         }
-        $results = $this->get_widget_query_results($widget_type, 0, ARRAY_A);
+        /* Dashboard exports carry no range : keep all logs */
+        $range = isset($_GET['wre_graph_range']) ? $this->get_404_range() : false;
+        $results = $this->get_widget_query_results($widget_type, 0, ARRAY_A, $range ? $range['since'] : '');
         if (!$results) {
             return;
         }
-        $this->basetoolbox->export_array_to_csv($results, 'top-404-' . $widget_type);
+        $this->basetoolbox->export_array_to_csv($results, 'top-404-' . $widget_type . ($range ? '-' . $range['id'] : ''));
     }
 
     /* Get alternative URL ending */

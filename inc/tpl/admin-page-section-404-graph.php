@@ -7,59 +7,20 @@ if (!current_user_can($this->user_level) || !$this->is_redirection_configured())
     return;
 }
 
-$nb_days = 30;
+$graph_settings = $this->get_404_range();
 
-$red_options = array();
-if (class_exists('Red_Options')) {
-    $red_options = Red_Options::get();
-}
-if (is_array($red_options) && isset($red_options['expire_404']) && is_numeric($red_options['expire_404'])) {
-    $nb_days = (int) $red_options['expire_404'];
-}
-
-$graph_range_title_day = __('404 errors over the last %d days', 'wpu_redirection_extended');
-$graph_range_title_hours = __('404 errors over the last %d hours', 'wpu_redirection_extended');
-$graph_ranges = array(
-    'days' => array(
-        'label' => sprintf(__('Last %d days', 'wpu_redirection_extended'), $nb_days),
-        'title' => sprintf(__('404 errors over the last %d days', 'wpu_redirection_extended'), $nb_days),
-        'unit' => 'day',
-        'periods' => $nb_days,
-        'format' => 'j M'
-    ),
-    '24h' => array(
-        'label' => sprintf(__('Last %d hours', 'wpu_redirection_extended'), 24),
-        'title' => sprintf($graph_range_title_hours, 24),
-        'unit' => 'hour',
-        'periods' => 24,
-        'format' => 'j M, H\h'
-    ),
-    '48h' => array(
-        'label' => sprintf(__('Last %d hours', 'wpu_redirection_extended'), 48),
-        'title' => sprintf($graph_range_title_hours, 48),
-        'unit' => 'hour',
-        'periods' => 48,
-        'format' => 'j M, H\h'
-    )
-);
-
-$graph_range = isset($_GET['wre_graph_range']) ? sanitize_key($_GET['wre_graph_range']) : 'days';
-if (!isset($graph_ranges[$graph_range])) {
-    $graph_range = 'days';
-}
-$graph_settings = $graph_ranges[$graph_range];
-
-echo '<h2>' . esc_html($graph_settings['title']) . '</h2>';
-
+/* Range selector applies to the whole tab (graph + widgets) */
 $graph_links = array();
-foreach ($graph_ranges as $range_id => $range_infos) {
-    if ($range_id === $graph_range) {
+foreach ($this->get_404_ranges() as $range_id => $range_infos) {
+    if ($range_id === $graph_settings['id']) {
         $graph_links[] = '<strong>' . esc_html($range_infos['label']) . '</strong>';
         continue;
     }
     $graph_links[] = '<a href="' . esc_url(add_query_arg('wre_graph_range', $range_id)) . '">' . esc_html($range_infos['label']) . '</a>';
 }
 echo '<p>' . implode(' | ', $graph_links) . '</p>';
+
+echo '<h2>' . esc_html($graph_settings['title']) . '</h2>';
 
 $graph_counts = $this->get_404_counts($graph_settings['periods'], $graph_settings['unit']);
 
