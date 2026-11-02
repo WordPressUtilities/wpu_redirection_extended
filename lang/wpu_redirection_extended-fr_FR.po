@@ -915,3 +915,15 @@ msgstr "User agents ignorés"
 #: .././wpu_redirection_extended.php
 msgid "One pattern per line, matched anywhere in the user agent (case-insensitive)."
 msgstr "Un motif par ligne, recherché n’importe où dans le user agent (insensible à la casse)."
+
+#: inc/tpl/admin-page-section-404-graph.php
+msgid "Filter by URL…"
+msgstr "Filtrer par URL…"
+
+#: inc/tpl/admin-page-section-404-graph.php
+msgid "Filter"
+msgstr "Filtrer"
+
+#: inc/tpl/admin-page-section-404-graph.php
+msgid "Reset"
+msgstr "Réinitialiser"

@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.28.0
+Version: 0.29.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.28.0';
+    private $plugin_version = '0.29.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -2168,12 +2168,13 @@ class WPURedirectionExtended {
       Graph
     ---------------------------------------------------------- */
 
-    /* Load Chart.js on the plugin admin page only */
+    /* Load JS on the plugin admin page only */
     public function enqueue_admin_scripts($hook) {
         if ($hook !== 'tools_page_' . $this->plugin_settings['id'] . '-main') {
             return;
         }
-        wp_enqueue_script('wpu-redirection-extended-chartjs', plugins_url('assets/chart.umd.min.js', __FILE__), array(), '4.5.1', true);
+        wp_enqueue_script('wpu-redirection-extended-chartjs', plugins_url('assets/chart.umd.min.js', __FILE__), array(), '4.6.1', true);
+        wp_enqueue_script('wpu-redirection-extended-404-search', plugins_url('assets/admin-404-search.js', __FILE__), array(), $this->plugin_version, true);
     }
 
     /* 404 time range selected on the admin page (wre_graph_range), shared by the graph, widgets and CSV export */
@@ -2238,11 +2239,14 @@ class WPURedirectionExtended {
         /* Same start as the first period of get_404_counts() */
         $hourly = ('hour' === $range['unit']);
         $range['since'] = date($hourly ? 'Y-m-d H:00:00' : 'Y-m-d 00:00:00', strtotime('-' . ($range['periods'] - 1) . ' ' . $range['unit'], current_time('timestamp')));
+
+        /* Optional "URL contains" filter (wre_404_search), read independently from the range */
+        $range['search'] = isset($_GET['wre_404_search']) ? trim(sanitize_text_field(wp_unslash($_GET['wre_404_search']))) : '';
         return $range;
     }
 
     /* Number of 404 errors per day or per hour, missing periods filled with 0 */
-    public function get_404_counts($nb_periods = 30, $unit = 'day') {
+    public function get_404_counts($nb_periods = 30, $unit = 'day', $search = '') {
         global $wpdb;
 
         $hourly = ('hour' === $unit);
@@ -2259,10 +2263,10 @@ class WPURedirectionExtended {
             $start .= ' 00:00:00';
         }
 
+        $search_sql = $search ? $wpdb->prepare(' AND url LIKE %s', '%' . $wpdb->esc_like($search) . '%') : '';
         $results = $wpdb->get_results($wpdb->prepare("SELECT DATE_FORMAT(created, '{$sql_format}') AS period, COUNT(*) AS result_count
             FROM {$wpdb->prefix}redirection_404
-            WHERE created >= %s
-            GROUP BY period", $start), ARRAY_A);
+            WHERE created >= %s", $start) . $search_sql . " GROUP BY period", ARRAY_A);
 
         foreach ($results as $result) {
             if (isset($counts[$result['period']])) {
@@ -2296,7 +2300,7 @@ class WPURedirectionExtended {
         }
     }
 
-    public function get_widget_query_results($widget_type, $limit = 0, $output = OBJECT, $since = '') {
+    public function get_widget_query_results($widget_type, $limit = 0, $output = OBJECT, $since = '', $search = '') {
         global $wpdb;
         $limit_sql = $limit > 0 ? ' LIMIT ' . intval($limit) : '';
         $order_sql = ' ORDER BY result_count DESC ';
@@ -2309,14 +2313,16 @@ class WPURedirectionExtended {
         if ($since) {
             /* swap the table for a date-filtered derived table so every widget query (filtered ones included) is scoped without rewriting it. Breaks if a query aliases the table name itself. */
             $table = $wpdb->prefix . 'redirection_404';
-            $query = str_replace($table, $wpdb->prepare("(SELECT * FROM {$table} WHERE created >= %s) AS {$table}", $since), $query);
+            $search_sql = $search ? $wpdb->prepare(' AND url LIKE %s', '%' . $wpdb->esc_like($search) . '%') : '';
+            $query = str_replace($table, $wpdb->prepare("(SELECT * FROM {$table} WHERE created >= %s", $since) . $search_sql . ") AS {$table}", $query);
         }
         return $wpdb->get_results($query . $order_sql . $limit_sql, $output);
     }
 
     public function wpu_redirection_get_widget_content($widget_type = '', $range = false) {
         $since = $range ? $range['since'] : '';
-        $lines = $this->get_widget_query_results($widget_type, 10, ARRAY_A, $since);
+        $search = $range ? $range['search'] : '';
+        $lines = $this->get_widget_query_results($widget_type, 10, ARRAY_A, $since, $search);
         if (empty($lines)) {
             return '<p>' . esc_html__('No data found.', 'wpu_redirection_extended') . '</p>';
         }
@@ -2336,16 +2342,19 @@ class WPURedirectionExtended {
                 $html .= esc_html__('See all errors', 'wpu_redirection_extended');
                 $html .= '</a>';
             }
-            $html .= ' ' . $this->get_widget_download_button($widget_type, $range ? $range['id'] : '');
+            $html .= ' ' . $this->get_widget_download_button($widget_type, $range ? $range['id'] : '', $search);
             $html .= '</p>';
         }
         return $html;
     }
 
-    public function get_widget_download_button($widget_type, $range_id = '') {
+    public function get_widget_download_button($widget_type, $range_id = '', $search = '') {
         $download_url = admin_url('index.php?wpu_redir_ext_download_widget=' . $widget_type);
         if ($range_id) {
             $download_url = add_query_arg('wre_graph_range', $range_id, $download_url);
+        }
+        if ($search) {
+            $download_url = add_query_arg('wre_404_search', rawurlencode($search), $download_url);
         }
         $download_url = wp_nonce_url($download_url, 'wpu_redir_ext_download_' . $widget_type);
         return '<a class="button button-small" href="' . esc_url($download_url) . '">' . esc_html__('Export CSV', 'wpu_redirection_extended') . '</a>';
@@ -2376,7 +2385,7 @@ class WPURedirectionExtended {
         }
         /* Dashboard exports carry no range : keep all logs */
         $range = isset($_GET['wre_graph_range']) ? $this->get_404_range() : false;
-        $results = $this->get_widget_query_results($widget_type, 0, ARRAY_A, $range ? $range['since'] : '');
+        $results = $this->get_widget_query_results($widget_type, 0, ARRAY_A, $range ? $range['since'] : '', $range ? $range['search'] : '');
         if (!$results) {
             return;
         }

@@ -20,9 +20,18 @@ foreach ($this->get_404_ranges() as $range_id => $range_infos) {
 }
 echo '<p>' . implode(' | ', $graph_links) . '</p>';
 
+/* URL search applies to the whole tab too, behaviour in assets/admin-404-search.js */
+echo '<p>';
+echo '<label class="screen-reader-text" for="wre-404-search">' . esc_html__('Filter by URL…', 'wpu_redirection_extended') . '</label>';
+echo '<input type="search" id="wre-404-search" placeholder="' . esc_attr__('Filter by URL…', 'wpu_redirection_extended') . '" value="' . esc_attr($graph_settings['search']) . '" /> ';
+echo '<button type="button" id="wre-404-search-submit" class="button button-compact">' . esc_html__('Filter', 'wpu_redirection_extended') . '</button>';
+if ($graph_settings['search']) {
+    echo ' <a href="' . esc_url(remove_query_arg('wre_404_search')) . '">' . esc_html__('Reset', 'wpu_redirection_extended') . '</a>';
+}
+echo '</p>';
 echo '<h2>' . esc_html($graph_settings['title']) . '</h2>';
 
-$graph_counts = $this->get_404_counts($graph_settings['periods'], $graph_settings['unit']);
+$graph_counts = $this->get_404_counts($graph_settings['periods'], $graph_settings['unit'], $graph_settings['search']);
 
 if (!array_sum($graph_counts)) {
     echo '<p>' . esc_html__('No data found.', 'wpu_redirection_extended') . '</p>';
