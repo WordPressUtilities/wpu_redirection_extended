@@ -88,6 +88,12 @@ msgstr ""
 "Les notifications par webhook sont activées mais aucune URL de webhook n'est "
 "configurée."
 
+#: .././inc/WPUBaseNotify/WPUBaseNotify.php:328
+msgid "Email notifications are enabled but the notifications email is invalid."
+msgstr ""
+"Les notifications par e-mail sont activées mais l'e-mail de notification "
+"est invalide."
+
 #: .././inc/WPUBaseSettings/WPUBaseSettings.php:203
 #: .././inc/WPUBaseSettings/WPUBaseSettings.php:824
 #: .././inc/WPUBaseSettings/WPUBaseSettings.php:846

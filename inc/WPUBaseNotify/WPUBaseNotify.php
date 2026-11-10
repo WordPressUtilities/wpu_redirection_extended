@@ -4,7 +4,7 @@ namespace wpu_redirection_extended;
 /*
 Class Name: WPU Base Notify
 Description: A class to send plain text alerts by email or webhook
-Version: 0.2.0
+Version: 0.3.1
 Class URI: https://github.com/WordPressUtilities/wpubaseplugin
 Author: Darklg
 Author URI: https://darklg.me/
@@ -236,10 +236,6 @@ class WPUBaseNotify {
 
     private function is_channel_enabled($id, $channel) {
         $value = $this->get_option_value($this->get_notification_field_id($id));
-        /* Never saved : fall back on the same default as the settings field */
-        if ($value === null) {
-            return $channel == 'email';
-        }
         return is_array($value) && in_array($channel, $value);
     }
 
@@ -249,6 +245,16 @@ class WPUBaseNotify {
     }
 
     private function get_option_value($key) {
+        /* Same constant override as WPUBaseSettings */
+        $constant_name = strtoupper($this->option_id . '_' . $key);
+        if (defined($constant_name)) {
+            $value = constant($constant_name);
+            /* A checkbox list can be forced as a comma separated string */
+            if (strpos($key, $this->prefix . 'notif_') === 0 && !is_array($value)) {
+                $value = array_filter(array_map('trim', explode(',', (string) $value)));
+            }
+            return $value;
+        }
         $options = get_option($this->option_id);
         if (!is_array($options) || !isset($options[$key])) {
             return null;
@@ -256,9 +262,9 @@ class WPUBaseNotify {
         return $options[$key];
     }
 
-    private function has_enabled_webhook_notification() {
+    private function has_enabled_channel($channel) {
         foreach ($this->notifications as $id => $notification) {
-            if ($this->is_channel_enabled($id, 'slack')) {
+            if ($this->is_channel_enabled($id, $channel)) {
                 return true;
             }
         }
@@ -315,8 +321,11 @@ class WPUBaseNotify {
         if ($raw_webhook && !$this->get_webhook()) {
             $messages[] = __('The notifications webhook URL must start with https://', __NAMESPACE__);
         }
-        if (!$raw_webhook && $this->has_enabled_webhook_notification()) {
+        if (!$raw_webhook && $this->has_enabled_channel('slack')) {
             $messages[] = __('Webhook notifications are enabled but no webhook URL is configured.', __NAMESPACE__);
+        }
+        if (!$this->get_email_to() && $this->has_enabled_channel('email')) {
+            $messages[] = __('Email notifications are enabled but the notifications email is invalid.', __NAMESPACE__);
         }
 
         /* Runtime failures : kept until the faulty config changes */
