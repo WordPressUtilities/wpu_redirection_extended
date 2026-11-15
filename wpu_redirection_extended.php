@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.29.1
+Version: 0.30.0
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.29.1';
+    private $plugin_version = '0.30.0';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -1132,6 +1132,11 @@ class WPURedirectionExtended {
                 'value' => 'pass',
                 'label' => __('Query parameter matching', 'wpu_redirection_extended'),
                 'value_label' => __('ignore and pass all parameters', 'wpu_redirection_extended')
+            ),
+            'flag_trailing' => array(
+                'value' => true,
+                'label' => __('Trailing slashes', 'wpu_redirection_extended'),
+                'value_label' => __('ignore', 'wpu_redirection_extended')
             )
         ));
     }
@@ -1431,9 +1436,29 @@ class WPURedirectionExtended {
                 }
                 $match_data = json_decode($redirection->match_data, true);
 
+                $match_data_changed = false;
+
                 /* Invalid flag query */
                 if ($this->page_action__main__clean_redirections__invalid_flag_query($redirection, $match_data, $diagnostic_only)) {
                     $issues_found++;
+                    $match_data_changed = true;
+                }
+
+                /* Trailing slash not ignored */
+                if ($this->page_action__main__clean_redirections__missing_flag_trailing($redirection, $match_data, $diagnostic_only)) {
+                    $issues_found++;
+                    $match_data_changed = true;
+                }
+
+                /* Single update so both fixes are kept */
+                if (!$diagnostic_only && $match_data_changed) {
+                    $wpdb->update(
+                        $wpdb->prefix . 'redirection_items',
+                        array('match_data' => json_encode($match_data)),
+                        array('id' => $redirection->id),
+                        array('%s'),
+                        array('%d')
+                    );
                 }
             }
 
@@ -1553,10 +1578,8 @@ class WPURedirectionExtended {
         return $duplicate_ids;
     }
 
-    /* Check if a redirection has an invalid flag query and disable it if not in diagnostic mode */
-    public function page_action__main__clean_redirections__invalid_flag_query($redirection, $match_data, $diagnostic_only = false) {
-        global $wpdb;
-
+    /* Check if a redirection has an invalid flag query and fix $match_data if not in diagnostic mode (saved by the caller) */
+    public function page_action__main__clean_redirections__invalid_flag_query($redirection, &$match_data, $diagnostic_only = false) {
         $has_invalid_flag_query = false;
         if (!isset($match_data['source']) || !is_array($match_data['source']) || !isset($match_data['source']['flag_query']) || $match_data['source']['flag_query'] != 'pass') {
             $has_invalid_flag_query = true;
@@ -1573,13 +1596,36 @@ class WPURedirectionExtended {
                 $match_data['source'] = array();
             }
             $match_data['source']['flag_query'] = 'pass';
-            $wpdb->update(
-                $wpdb->prefix . 'redirection_items',
-                array('match_data' => json_encode($match_data)),
-                array('id' => $redirection->id),
-                array('%s'),
-                array('%d')
-            );
+        }
+        return true;
+    }
+
+    /* Check if a redirection does not ignore trailing slashes and fix $match_data if not in diagnostic mode (saved by the caller) */
+    public function page_action__main__clean_redirections__missing_flag_trailing($redirection, &$match_data, $diagnostic_only = false) {
+
+        /* Flag is not applied to regex sources */
+        if ($redirection->match_url == 'regex') {
+            return false;
+        }
+
+        $path = rtrim($redirection->url, '/');
+
+        /* Root URL, or file URL : a trailing slash variant is never requested */
+        if ($path === '' || pathinfo($path, PATHINFO_EXTENSION) !== '') {
+            return false;
+        }
+
+        if (!empty($match_data['source']['flag_trailing'])) {
+            return false;
+        }
+
+        if ($diagnostic_only) {
+            $this->add_redirection_issue($redirection, __('Trailing slashes are not ignored: the URL will not match with and without a trailing slash.', 'wpu_redirection_extended'));
+        } else {
+            if (!isset($match_data['source']) || !is_array($match_data['source'])) {
+                $match_data['source'] = array();
+            }
+            $match_data['source']['flag_trailing'] = true;
         }
         return true;
     }

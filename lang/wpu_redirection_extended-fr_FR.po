@@ -933,3 +933,14 @@ msgstr "Filtrer"
 #: inc/tpl/admin-page-section-404-graph.php
 msgid "Reset"
 msgstr "Réinitialiser"
+
+msgid "Trailing slashes are not ignored: the URL will not match with and without a trailing slash."
+msgstr ""
+"La barre oblique finale n’est pas ignorée : l’URL ne correspondra pas avec et "
+"sans barre oblique finale."
+
+msgid "Trailing slashes"
+msgstr "Barre oblique finale"
+
+msgid "ignore"
+msgstr "ignorer"
