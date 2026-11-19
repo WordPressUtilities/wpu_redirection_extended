@@ -4,7 +4,7 @@ Plugin Name: WPU Redirection Extended
 Plugin URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Update URI: https://github.com/WordPressUtilities/wpu_redirection_extended
 Description: Enhance the Redirection plugin with additional features.
-Version: 0.30.0
+Version: 0.30.1
 Author: darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_redirection_extended
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPURedirectionExtended {
-    private $plugin_version = '0.30.0';
+    private $plugin_version = '0.30.1';
     private $plugin_settings = array(
         'id' => 'wpu_redirection_extended',
         'name' => 'WPU Redirection Extended'
@@ -394,6 +394,7 @@ class WPURedirectionExtended {
             '/admin/',
             '.env',
             '.git/',
+            '.well-known/',
             '.yml',
             '.yaml',
             '.sql',
@@ -806,8 +807,8 @@ class WPURedirectionExtended {
         $exclude_slugs = isset($_POST['sitemap_exclude_existing_slugs']) && $_POST['sitemap_exclude_existing_slugs'] == '1';
         $exclude_redirs = isset($_POST['sitemap_exclude_existing_redirections']) && $_POST['sitemap_exclude_existing_redirections'] == '1';
 
-        $existing_slugs = $exclude_slugs ? $this->get_existing_slugs() : array();
-        $existing_redirs = $exclude_redirs ? $this->get_existing_redirections() : array();
+        $existing_slugs = $exclude_slugs ? array_flip($this->get_existing_slugs()) : array();
+        $existing_redirs = $exclude_redirs ? array_flip($this->get_existing_redirections()) : array();
 
         $csv_values = array();
         foreach ($sources as $src) {
@@ -816,10 +817,10 @@ class WPURedirectionExtended {
             }
             if ($exclude_slugs || $exclude_redirs) {
                 $alt = $this->get_alternative_url($src);
-                if ($exclude_slugs && (in_array($src, $existing_slugs) || in_array($alt, $existing_slugs))) {
+                if ($exclude_slugs && (isset($existing_slugs[$src]) || isset($existing_slugs[$alt]))) {
                     continue;
                 }
-                if ($exclude_redirs && (in_array($src, $existing_redirs) || in_array($alt, $existing_redirs))) {
+                if ($exclude_redirs && (isset($existing_redirs[$src]) || isset($existing_redirs[$alt]))) {
                     continue;
                 }
             }
@@ -859,7 +860,7 @@ class WPURedirectionExtended {
 
         $max_response_size = (int) apply_filters('wpu_redirection_extended__sitemap_max_response_size', 50 * 1024 * 1024);
 
-        $response = wp_remote_get($url, array(
+        $response = wp_safe_remote_get($url, array(
             'timeout' => $timeout,
             'redirection' => 5,
             'limit_response_size' => $max_response_size,
@@ -1014,10 +1015,11 @@ class WPURedirectionExtended {
         }
 
         $all_urls = array();
+        $all_urls_lookup = array();
 
         /* Step 1: try robots.txt */
         $robots_url = rtrim($base_url, '/') . '/robots.txt';
-        $robots_response = wp_remote_get($robots_url, array(
+        $robots_response = wp_safe_remote_get($robots_url, array(
             'timeout' => $discovery_timeout,
             'redirection' => 3,
             'user-agent' => 'WPU Redirection Extended Sitemap Fetcher'
@@ -1038,7 +1040,8 @@ class WPURedirectionExtended {
             $this->fetch_sitemap_urls($sitemap_url, $probe_urls, $max_urls - count($all_urls), $max_children, $http_timeout, $probe_reached);
             if (!empty($probe_urls)) {
                 foreach ($probe_urls as $u) {
-                    if (!in_array($u, $all_urls, true)) {
+                    if (!isset($all_urls_lookup[$u])) {
+                        $all_urls_lookup[$u] = true;
                         $all_urls[] = $u;
                     }
                     if (count($all_urls) >= $max_urls) {
@@ -1226,13 +1229,13 @@ class WPURedirectionExtended {
         $filter_existing_slugs = isset($_POST['filter_existing_slugs']) && $_POST['filter_existing_slugs'] == '1';
         $existing_slugs = array();
         if ($filter_existing_slugs) {
-            $existing_slugs = $this->get_existing_slugs();
+            $existing_slugs = array_flip($this->get_existing_slugs());
         }
 
         $filter_existing_redirections = isset($_POST['filter_existing_redirections']) && $_POST['filter_existing_redirections'] == '1';
         $existing_redirections = array();
         if ($filter_existing_redirections) {
-            $existing_redirections = $this->get_existing_redirections();
+            $existing_redirections = array_flip($this->get_existing_redirections());
         }
 
         $excluded_prefixes = apply_filters('wpu_redirection_extended__submit_csv_excluded_prefixes', array(
@@ -1343,24 +1346,22 @@ class WPURedirectionExtended {
             $alternative_before = $this->get_alternative_url($before);
 
             /* Filter duplicates within CSV */
-            if (in_array($before, $seen_before) || in_array($alternative_before, $seen_before)) {
+            if (isset($seen_before[$before]) || isset($seen_before[$alternative_before])) {
                 $errors_list[] = sprintf(__('Line %s: before value is a duplicate within the CSV.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
-            $seen_before[] = $before;
-            if ($alternative_before !== $before) {
-                $seen_before[] = $alternative_before;
-            }
+            $seen_before[$before] = true;
+            $seen_before[$alternative_before] = true;
 
             /* Filter existing slugs */
-            if ($filter_existing_slugs && (in_array($before, $existing_slugs) || in_array($alternative_before, $existing_slugs))) {
+            if ($filter_existing_slugs && (isset($existing_slugs[$before]) || isset($existing_slugs[$alternative_before]))) {
                 $errors_list[] = sprintf(__('Line %s: before value already exists as a slug.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
 
             /* Filter existing redirections */
-            if ($filter_existing_redirections && (in_array($before, $existing_redirections) || in_array($alternative_before, $existing_redirections))) {
+            if ($filter_existing_redirections && (isset($existing_redirections[$before]) || isset($existing_redirections[$alternative_before]))) {
                 $errors_list[] = sprintf(__('Line %s: before value already exists as a redirection.', 'wpu_redirection_extended'), $line_number);
                 continue;
             }
@@ -2066,7 +2067,7 @@ class WPURedirectionExtended {
         }
         if ($pagenow == 'term.php' && isset($_GET['tag_ID'], $_GET['taxonomy'])) {
             $term_id = intval($_GET['tag_ID']);
-            $taxonomy = sanitize_text_field($_GET['taxonomy']);
+            $taxonomy = sanitize_key(wp_unslash($_GET['taxonomy']));
             $term_link = get_term_link($term_id, $taxonomy);
             if (!is_wp_error($term_link)) {
                 $slug = wp_make_link_relative($term_link);
@@ -2449,16 +2450,18 @@ class WPURedirectionExtended {
 
     /* Is redirection configured */
     public function is_redirection_configured() {
+        static $is_configured = null;
+        if ($is_configured !== null) {
+            return $is_configured;
+        }
         if (!defined('REDIRECTION_DB_VERSION')) {
-            return false;
+            return $is_configured = false;
         }
 
         global $wpdb;
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$wpdb->prefix}redirection_items'") === "{$wpdb->prefix}redirection_items";
-        if (!$table_exists) {
-            return false;
-        }
-        return true;
+        $table = $wpdb->prefix . 'redirection_items';
+        $is_configured = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table))) === $table;
+        return $is_configured;
     }
 
     /* Field */

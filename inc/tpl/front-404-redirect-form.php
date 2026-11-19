@@ -17,13 +17,12 @@ if (!empty($suggestions)) {
     echo '<div style="display:flex;flex-direction:column;gap:4px">';
     echo '<div style="font-size:12px;opacity:.7">' . esc_html__('Suggestions', 'wpu_redirection_extended') . '</div>';
     foreach ($suggestions as $suggestion) {
-        $abs = esc_attr(home_url($suggestion['url']));
-        echo '<button type="button" class="wpu-redir-ext-suggestion" data-target="' . $abs . '" style="text-align:left;padding:0.2em 0.4em;font-size: 0.9em;border:1px solid #50575e;background:#2c3338;color:#fff;border-radius:4px;cursor:pointer">' . esc_html($suggestion['url']) . '</button>';
+        echo '<button type="button" class="wpu-redir-ext-suggestion" data-target="' . esc_url(home_url($suggestion['url'])) . '" style="text-align:left;padding:0.2em 0.4em;font-size: 0.9em;border:1px solid #50575e;background:#2c3338;color:#fff;border-radius:4px;cursor:pointer">' . esc_html($suggestion['url']) . '</button>';
     }
     echo '</div>';
 }
 
-echo '<button type="submit" class="button button-primary" style="padding:6px 12px;cursor:pointer;color:#000 !important">' . esc_html__('Redirect', 'wpu_redirection_extended') . '</button>';
+echo '<button type="submit" class="button button-primary" style="padding:6px 12px;cursor:pointer;color:#000 !important;background:#fff!important">' . esc_html__('Redirect', 'wpu_redirection_extended') . '</button>';
 echo '</form>';
 
 echo '<script>(function(){var m=document.getElementById("wpu-redir-ext-404-modal");if(!m){return;}m.querySelectorAll(".wpu-redir-ext-suggestion").forEach(function(b){b.addEventListener("click",function(){var t=m.querySelector("[name=target]");if(t){t.value=this.getAttribute("data-target");t.focus();}});});})();</script>';
